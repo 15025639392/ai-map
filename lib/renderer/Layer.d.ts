@@ -56,6 +56,10 @@ export declare abstract class Layer implements IRenderNode {
      */
     isVisible(): boolean;
     /**
+     * 检查是否已销毁
+     */
+    protected isDisposed(): boolean;
+    /**
      * 注册 WebGL 资源
      */
     protected registerResource(resourceId: string, type: 'texture' | 'program' | 'buffer' | 'framebuffer', resource: WebGLTexture | WebGLProgram | WebGLBuffer | WebGLFramebuffer, disposeFn: () => void): void;

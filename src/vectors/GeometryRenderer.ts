@@ -4,8 +4,6 @@ import {
   IGeometry,
   GeometryType,
   Coordinates,
-  LineCoordinates,
-  PolygonCoordinates,
   IVectorStyle,
   IRenderStats,
 } from '../vectortypes.js';
@@ -250,10 +248,12 @@ export class GeometryRenderer {
     const vertices: number[] = [];
 
     for (const polygon of polygons) {
-      // 使用三角扇绘制多边形
-      const triangles = this.triangulate(polygon);
-      for (let i = 0; i < triangles.length; i++) {
-        vertices.push(triangles[i]);
+      // 对多边形的每个环进行三角化
+      for (const ring of polygon) {
+        const triangles = this.triangulate(ring);
+        for (let i = 0; i < triangles.length; i++) {
+          vertices.push(triangles[i]);
+        }
       }
     }
 
@@ -269,13 +269,7 @@ export class GeometryRenderer {
     gl.vertexAttrib4f(colorLoc, colors[0], colors[1], colors[2], colors[3]);
 
     // 绘制
-    let offset = 0;
-    for (const polygon of polygons) {
-      const triangles = this.triangulate(polygon);
-      // @ts-ignore - 类型断言
-      gl.drawArrays(gl.TRIANGLES, offset, triangles.length / 3);
-      offset += triangles.length;
-    }
+    gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
 
     // 清理
     gl.deleteBuffer(positionBuffer);
@@ -295,29 +289,29 @@ export class GeometryRenderer {
   /**
    * 提取线坐标
    */
-  private extractLineCoordinates(geometry: IGeometry): LineCoordinates {
+  private extractLineCoordinates(geometry: IGeometry): Coordinates[] {
     if (geometry.type === GeometryType.LINE) {
       return [geometry.coordinates as Coordinates];
     } else {
-      return geometry.coordinates as LineCoordinates;
+      return geometry.coordinates as Coordinates[];
     }
   }
 
   /**
    * 提取面坐标
    */
-  private extractPolygonCoordinates(geometry: IGeometry): PolygonCoordinates {
+  private extractPolygonCoordinates(geometry: IGeometry): Coordinates[][] {
     if (geometry.type === GeometryType.POLYGON) {
       return [geometry.coordinates as Coordinates[]];
     } else {
-      return geometry.coordinates as PolygonCoordinates;
+      return geometry.coordinates as Coordinates[][];
     }
   }
 
   /**
    * 三角化多边形（简化版）
    */
-  private triangulate(ring: Coordinates[]): number[] {
+  private triangulate(ring: Coordinates): number[] {
     // 简化的三角化：将多边形分解为三角形
     const vertices: number[] = [];
     if (ring.length < 3) return vertices;

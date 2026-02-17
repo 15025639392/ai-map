@@ -4,8 +4,6 @@ import {
   IGeometry,
   GeometryType,
   Coordinates,
-  LineCoordinates,
-  PolygonCoordinates,
   Coordinate,
 } from '../vectortypes.js';
 
@@ -17,17 +15,18 @@ export class GeoJSONParser {
    * 解析 GeoJSON 数据
    */
   static parse(geojson: GeoJSONData): IFeature[] {
-    if (geojson.type === 'FeatureCollection') {
+    const type = geojson.type;
+    if (type === 'FeatureCollection') {
       return geojson.features
         .filter((f) => f.geometry)
         .map((f) => this.parseFeature(f));
-    } else if (geojson.type === 'Feature') {
+    } else if (type === 'Feature') {
       if (!geojson.geometry) {
         throw new Error('GeoJSON Feature must have geometry');
       }
       return [this.parseFeature(geojson)];
     } else {
-      throw new Error(`Unsupported GeoJSON type: ${geojson.type}`);
+      throw new Error(`Unsupported GeoJSON type: ${type}`);
     }
   }
 
@@ -69,22 +68,19 @@ export class GeoJSONParser {
           coordinates: this.parseLineCoordinates(geometry.coordinates),
         };
       case 'MultiLineString':
-        // @ts-ignore - 类型转换问题
         return {
           type: GeometryType.MULTI_LINE,
-          coordinates: this.parseLineCoordinatesArray(geometry.coordinates) as LineCoordinates,
+          coordinates: this.parseMultiLineCoordinates(geometry.coordinates),
         };
       case 'Polygon':
-        // @ts-ignore - 类型转换问题
         return {
           type: GeometryType.POLYGON,
-          coordinates: this.parsePolygonCoordinates(geometry.coordinates) as PolygonCoordinates,
+          coordinates: this.parsePolygonCoordinates(geometry.coordinates),
         };
       case 'MultiPolygon':
-        // @ts-ignore - 类型转换问题
         return {
           type: GeometryType.MULTI_POLYGON,
-          coordinates: this.parsePolygonCoordinatesArray(geometry.coordinates) as PolygonCoordinates,
+          coordinates: this.parseMultiPolygonCoordinates(geometry.coordinates),
         };
       default:
         throw new Error(`Unsupported geometry type: ${geometry.type}`);
@@ -94,7 +90,7 @@ export class GeoJSONParser {
   /**
    * 解析坐标
    */
-  private static parseCoordinates(coords: any): Coordinates {
+  private static parseCoordinates(coords: any): Coordinate {
     if (!Array.isArray(coords) || coords.length < 2) {
       throw new Error('Invalid coordinate format');
     }
@@ -114,17 +110,21 @@ export class GeoJSONParser {
   /**
    * 解析线坐标
    */
-  private static parseLineCoordinates(coords: any): LineCoordinates {
+  private static parseLineCoordinates(coords: any): Coordinates {
     if (!Array.isArray(coords) || coords.length < 2) {
       throw new Error('Invalid LineString format');
     }
-    return coords.map((c) => this.parseCoordinates(c));
+    const result: Coordinates = [];
+    for (const c of coords) {
+      result.push(this.parseCoordinates(c as any));
+    }
+    return result;
   }
 
   /**
-   * 解析线坐标数组
+   * 解析多线坐标数组
    */
-  private static parseLineCoordinatesArray(coords: any): LineCoordinates {
+  private static parseMultiLineCoordinates(coords: any): Coordinates[] {
     if (!Array.isArray(coords) || coords.length < 1) {
       throw new Error('Invalid MultiLineString format');
     }
@@ -134,7 +134,7 @@ export class GeoJSONParser {
   /**
    * 解析面坐标
    */
-  private static parsePolygonCoordinates(coords: any): PolygonCoordinates {
+  private static parsePolygonCoordinates(coords: any): Coordinates[] {
     if (!Array.isArray(coords) || coords.length < 1) {
       throw new Error('Invalid Polygon format');
     }
@@ -142,9 +142,9 @@ export class GeoJSONParser {
   }
 
   /**
-   * 解析面坐标数组
+   * 解析多面坐标数组
    */
-  private static parsePolygonCoordinatesArray(coords: any): PolygonCoordinates {
+  private static parseMultiPolygonCoordinates(coords: any): Coordinates[][] {
     if (!Array.isArray(coords) || coords.length < 1) {
       throw new Error('Invalid MultiPolygon format');
     }

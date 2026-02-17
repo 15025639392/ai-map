@@ -194,6 +194,13 @@ export abstract class Layer implements IRenderNode {
   }
 
   /**
+   * 检查是否已销毁
+   */
+  protected isDisposed(): boolean {
+    return this._disposed;
+  }
+
+  /**
    * 注册 WebGL 资源
    */
   protected registerResource(

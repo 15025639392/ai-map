@@ -28,17 +28,17 @@ export declare class GeoJSONParser {
      */
     private static parseLineCoordinates;
     /**
-     * 解析线坐标数组
+     * 解析多线坐标数组
      */
-    private static parseLineCoordinatesArray;
+    private static parseMultiLineCoordinates;
     /**
      * 解析面坐标
      */
     private static parsePolygonCoordinates;
     /**
-     * 解析面坐标数组
+     * 解析多面坐标数组
      */
-    private static parsePolygonCoordinatesArray;
+    private static parseMultiPolygonCoordinates;
     /**
      * 计算 geometry 的边界框
      */

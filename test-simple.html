@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple RasterLayer Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+        pre {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple RasterLayer Import Test</h1>
+    <div id="result">Loading...</div>
+
+    <script type="module">
+        async function testImport() {
+            const resultDiv = document.getElementById('result');
+
+            try {
+                console.log('Attempting to import RasterLayer...');
+
+                // 直接导入
+                const { RasterLayer, VectorLayer, Renderer, Layer } = await import('./lib/index.js');
+
+                console.log('Import successful!');
+                console.log('RasterLayer:', RasterLayer);
+                console.log('VectorLayer:', VectorLayer);
+                console.log('Renderer:', Renderer);
+                console.log('Layer:', Layer);
+
+                // 测试创建实例
+                const rasterLayer = new RasterLayer({
+                    name: 'Test Raster Layer',
+                    tileUrl: 'https://example.com/tiles/{z}/{x}/{y}.png',
+                    minZoom: 1,
+                    maxZoom: 18,
+                    zoom: 10
+                });
+
+                console.log('RasterLayer instance created:', rasterLayer);
+
+                // 显示结果
+                resultDiv.innerHTML = `
+                    <h2 class="success">✓ Import Successful!</h2>
+                    <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 20px;">
+                        <p><strong>Renderer:</strong> <span class="success">${typeof Renderer}</span></p>
+                        <p><strong>Layer:</strong> <span class="success">${typeof Layer}</span></p>
+                        <p><strong>RasterLayer:</strong> <span class="success">${typeof RasterLayer}</span></p>
+                        <p><strong>VectorLayer:</strong> <span class="success">${typeof VectorLayer}</span></p>
+                        <hr>
+                        <h3>RasterLayer Instance:</h3>
+                        <p><strong>Name:</strong> ${rasterLayer.name}</p>
+                        <p><strong>Tile URL:</strong> ${rasterLayer.getTileUrl()}</p>
+                        <p><strong>Zoom:</strong> ${rasterLayer.getZoom()}</p>
+                        <p><strong>Min Zoom:</strong> ${rasterLayer.getMinZoom()}</p>
+                        <p><strong>Max Zoom:</strong> ${rasterLayer.getMaxZoom()}</p>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Import failed:', error);
+                resultDiv.innerHTML = `
+                    <h2 class="error">✗ Import Failed!</h2>
+                    <div style="background: white; padding: 15px; border-radius: 4px; margin-top: 20px;">
+                        <p><strong>Error Message:</strong></p>
+                        <p class="error">${error.message}</p>
+                        <hr>
+                        <p><strong>Stack Trace:</strong></p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        testImport();
+    </script>
+</body>
+</html>

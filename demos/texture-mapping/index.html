@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>纹理映射 - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto 20px;
+            cursor: grab;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #30cfd0;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(48, 207, 208, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #30cfd0;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 纹理映射 - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+        
+        <div class="controls">
+            <button onclick="createCheckerTexture()">棋盘纹理</button>
+            <button onclick="createGradientTexture()">渐变纹理</button>
+            <button onclick="createNoiseTexture()">噪点纹理</button>
+            <button onclick="toggleWrap()">切换包装模式</button>
+            <button onclick="toggleFilter()">切换滤镜</button>
+            <button onclick="resetView()">重置视图</button>
+        </div>
+
+        <div class="info">
+            <div class="info-item">
+                <div class="info-label">纹理类型</div>
+                <div class="info-value" id="textureType">棋盘</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">纹理尺寸</div>
+                <div class="info-value">256x256</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">包装模式</div>
+                <div class="info-value" id="wrapMode">重复</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">滤镜</div>
+                <div class="info-value" id="filterMode">线性</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">鼠标位置</div>
+                <div class="info-value" id="mousePos">0, 0</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // WebGL 上下文
+        let gl = null;
+        let texture = null;
+        let textureType = 'checker';
+
+        // 状态
+        let wrapMode = 'repeat';
+        let filterMode = 'linear';
+        let mouseX = 0;
+        let mouseY = 0;
+
+        // 初始化 WebGL
+        function initWebGL() {
+            const canvas = document.getElementById('canvas');
+            gl = canvas.getContext('webgl2');
+            
+            if (!gl) {
+                alert('WebGL2 不被支持，请使用现代浏览器');
+                return false;
+            }
+
+            // 设置视口
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            // 创建初始纹理
+            createCheckerTexture();
+
+            // 设置事件监听
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseleave', onMouseLeave);
+            window.addEventListener('resize', onResize);
+
+            // 启动渲染循环
+            requestAnimationFrame(render);
+
+            console.log('✅ 纹理映射示例启动成功！');
+            return true;
+        }
+
+        // 创建棋盘纹理
+        function createCheckerTexture() {
+            const size = 256;
+            const data = new Uint8Array(size * size * 4);
+            
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const i = (y * size + x) * 4;
+                    const checker = ((x >> 4) + (y >> 4)) & 1;
+                    const color = checker ? 
+                        [255, 255, 255, 255] : // 白色
+                        [50, 50, 50, 255];      // 灰色
+                    data[i] = color[0];
+                    data[i + 1] = color[1];
+                    data[i + 2] = color[2];
+                    data[i + 3] = color[3];
+                }
+            }
+
+            createTextureFromData(data, size, size, 'checker');
+            textureType = 'checker';
+            updateUI();
+        }
+
+        // 创建渐变纹理
+        function createGradientTexture() {
+            const size = 256;
+            const data = new Uint8Array(size * size * 4);
+            
+            for (let y = 0; y < size; y++) {
+                const t = y / size;
+                for (let x = 0; x < size; x++) {
+                    const i = (y * size + x) * 4;
+                    const s = x / size;
+                    
+                    // 创建 RGB 渐变
+                    data[i] = Math.floor(255 * (1.0 - t));
+                    data[i + 1] = Math.floor(255 * s);
+                    data[i + 2] = Math.floor(255 * t * s);
+                    data[i + 3] = 255;
+                }
+            }
+
+            createTextureFromData(data, size, size, 'gradient');
+            textureType = 'gradient';
+            updateUI();
+        }
+
+        // 创建噪点纹理
+        function createNoiseTexture() {
+            const size = 256;
+            const data = new Uint8Array(size * size * 4);
+            
+            for (let i = 0; i < size * size * 4; i += 4) {
+                data[i] = Math.floor(Math.random() * 255);
+                data[i + 1] = Math.floor(Math.random() * 255);
+                data[i + 2] = Math.floor(Math.random() * 255);
+                data[i + 3] = 255;
+            }
+
+            createTextureFromData(data, size, size, 'noise');
+            textureType = 'noise';
+            updateUI();
+        }
+
+        // 从数据创建纹理
+        function createTextureFromData(data, width, height, type) {
+            if (texture) {
+                gl.deleteTexture(texture);
+            }
+
+            texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+
+            // 上传纹理数据
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                gl.RGBA,
+                width,
+                height,
+                0,
+                gl.RGBA,
+                gl.UNSIGNED_BYTE,
+                data
+            );
+
+            // 设置包装模式
+            const wrap = wrapMode === 'repeat' ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+
+            // 设置滤镜
+            const filter = filterMode === 'linear' ? gl.LINEAR : gl.NEAREST;
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+
+            // 生成 mipmap
+            gl.generateMipmap(gl.TEXTURE_2D);
+
+            console.log(`✓ 创建纹理: ${type}`);
+        }
+
+        // 渲染函数
+        function render() {
+            if (!gl) return;
+
+            // 清空画布
+            gl.clearColor(0.2, 0.3, 0.4, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            if (!texture) return;
+
+            // 顶点着色器
+            const vertexShaderSource = `
+                attribute vec4 a_position;
+                attribute vec2 a_texCoord;
+                
+                uniform vec2 u_offset;
+                uniform float u_scale;
+                uniform float u_rotation;
+                
+                varying vec2 v_texCoord;
+                
+                void main() {
+                    // 应用旋转
+                    float c = cos(u_rotation);
+                    float s = sin(u_rotation);
+                    mat2 rotation = mat2(c, -s, s, c);
+                    
+                    // 应用缩放
+                    vec2 pos = a_position.xy * u_scale;
+                    
+                    // 应用旋转
+                    pos = rotation * pos;
+                    
+                    // 应用偏移
+                    pos += u_offset;
+                    
+                    gl_Position = vec4(pos, a_position.z, a_position.w);
+                    v_texCoord = a_texCoord;
+                }
+            `;
+
+            // 片段着色器
+            const fragmentShaderSource = `
+                precision mediump float;
+                
+                varying vec2 v_texCoord;
+                uniform sampler2D u_texture;
+                
+                void main() {
+                    vec4 color = texture2D(u_texture, v_texCoord);
+                    gl_FragColor = color;
+                }
+            `;
+
+            // 创建着色器
+            const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+            const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+            // 创建程序
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('着色器程序链接失败:', gl.getProgramInfoLog(program));
+                return;
+            }
+
+            // 使用程序
+            gl.useProgram(program);
+
+            // 设置顶点数据（带纹理坐标）
+            const vertices = new Float32Array([
+                // 位置             // 纹理坐标
+                -1.0, -1.0, 0.0,   0.0,
+                 1.0, -1.0, 0.0,   1.0,
+                -1.0,  1.0, 0.0,   0.0,
+                 1.0,  1.0, 0.0,   1.0,
+            ]);
+
+            const buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+            // 设置属性
+            const positionLoc = gl.getAttribLocation(program, 'a_position');
+            const texCoordLoc = gl.getAttribLocation(program, 'a_texCoord');
+
+            gl.enableVertexAttribArray(positionLoc);
+            gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 32, 0);
+
+            gl.enableVertexAttribArray(texCoordLoc);
+            gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 32, 8);
+
+            // 设置 uniform（鼠标位置控制偏移）
+            const offsetLoc = gl.getUniformLocation(program, 'u_offset');
+            const scaleLoc = gl.getUniformLocation(program, 'u_scale');
+            const rotationLoc = gl.getUniformLocation(program, 'u_rotation');
+            const textureLoc = gl.getUniformLocation(program, 'u_texture');
+
+            // 基于鼠标位置计算偏移
+            const canvas = gl.canvas;
+            const normalizedX = mouseX / canvas.width * 2 - 1;
+            const normalizedY = -mouseY / canvas.height * 2 + 1;
+            
+            gl.uniform2f(offsetLoc, normalizedX * 0.3, normalizedY * 0.3);
+            gl.uniform1f(scaleLoc, 1.0);
+            gl.uniform1f(rotationLoc, 0.0);
+            
+            // 绑定纹理
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.uniform1i(textureLoc, 0);
+
+            // 绘制
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // 清理
+            gl.deleteBuffer(buffer);
+            gl.deleteProgram(program);
+            gl.deleteShader(vertexShader);
+            gl.deleteShader(fragmentShader);
+
+            requestAnimationFrame(render);
+        }
+
+        // 创建着色器
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('着色器编译失败:', gl.getShaderInfoLog(shader));
+                return null;
+            }
+            
+            return shader;
+        }
+
+        // 切换包装模式
+        window.toggleWrap = function() {
+            wrapMode = wrapMode === 'repeat' ? 'clamp' : 'repeat';
+            updateTextureParams();
+            updateUI();
+        };
+
+        // 切换滤镜
+        window.toggleFilter = function() {
+            filterMode = filterMode === 'linear' ? 'nearest' : 'linear';
+            updateTextureParams();
+            updateUI();
+        };
+
+        // 更新纹理参数
+        function updateTextureParams() {
+            if (!texture) return;
+
+            const wrap = wrapMode === 'repeat' ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+            const filter = filterMode === 'linear' ? gl.LINEAR : gl.NEAREST;
+
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+        }
+
+        // 重置视图
+        window.resetView = function() {
+            mouseX = 400;
+            mouseY = 300;
+            updateUI();
+        };
+
+        // 鼠标移动事件
+        function onMouseMove(e) {
+            const canvas = e.target;
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            updateUI();
+        }
+
+        function onMouseLeave() {
+            // 鼠标离开时不更新
+        }
+
+        // 窗口大小改变
+        function onResize() {
+            const canvas = document.getElementById('canvas');
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+
+        // 更新 UI
+        function updateUI() {
+            document.getElementById('textureType').textContent = {
+                'checker': '棋盘',
+                'gradient': '渐变',
+                'noise': '噪点'
+            }[textureType];
+
+            document.getElementById('wrapMode').textContent = {
+                'repeat': '重复',
+                'clamp': '钳位'
+            }[wrapMode];
+
+            document.getElementById('filterMode').textContent = {
+                'linear': '线性',
+                'nearest': '最近'
+            }[filterMode];
+
+            document.getElementById('mousePos').textContent = `${Math.floor(mouseX)}, ${Math.floor(mouseY)}`;
+        }
+
+        // 初始化
+        initWebGL();
+    </script>
+</body>
+</html>

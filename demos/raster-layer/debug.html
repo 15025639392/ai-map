@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug RasterLayer Import</title>
+</head>
+<body>
+    <h1>Debug RasterLayer Import</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        const output = document.getElementById('output');
+
+        function log(message) {
+            console.log(message);
+            const div = document.createElement('div');
+            div.textContent = message;
+            output.appendChild(div);
+        }
+
+        try {
+            log('Step 1: Testing basic module import...');
+            const libIndex = await import('../../lib/index.js');
+            log('✓ Successfully imported lib/index.js');
+            log('  Available exports: ' + Object.keys(libIndex).join(', '));
+
+            log('\nStep 2: Checking specific exports...');
+            log('  Renderer: ' + (libIndex.Renderer ? '✓' : '✗'));
+            log('  Layer: ' + (libIndex.Layer ? '✓' : '✗'));
+            log('  RasterLayer: ' + (libIndex.RasterLayer ? '✓' : '✗'));
+            log('  VectorLayer: ' + (libIndex.VectorLayer ? '✓' : '✗'));
+
+            if (libIndex.RasterLayer) {
+                log('\nStep 3: Creating RasterLayer instance...');
+                const RasterLayer = libIndex.RasterLayer;
+                const layer = new RasterLayer({
+                    name: 'Debug Layer',
+                    tileUrl: 'https://example.com/tiles/{z}/{x}/{y}.png'
+                });
+                log('✓ RasterLayer instance created');
+                log('  Name: ' + layer.name);
+                log('  Tile URL: ' + layer.getTileUrl());
+            } else {
+                log('\n✗ RasterLayer export not found!');
+                log('  Available: ' + Object.keys(libIndex).filter(k => k.includes('Layer')).join(', '));
+            }
+
+            log('\n✅ Debug complete!');
+
+        } catch (error) {
+            log('✗ Error occurred:');
+            log('  Message: ' + error.message);
+            log('  Stack: ' + error.stack);
+        }
+    </script>
+</body>
+</html>

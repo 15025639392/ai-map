@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>着色器编程 - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #fa709a;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(250, 112, 154, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+
+        .info h3 {
+            margin-top: 0;
+            color: #fa709a;
+        }
+
+        .code {
+            background: #2d2d2d;
+            color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 着色器编程 - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+        
+        <div class="controls">
+            <button onclick="changeShader('basic')">基础着色器</button>
+            <button onclick="changeShader('gradient')">渐变着色器</button>
+            <button onclick="changeShader('pattern')">图案着色器</button>
+            <button onclick="toggleAnimation()">切换动画</button>
+        </div>
+
+        <div class="info">
+            <h3>当前着色器效果</h3>
+            <div id="shaderInfo" class="code">基础着色器</div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 顶点着色器
+        const vertexShaderSource = `
+            attribute vec4 a_position;
+            attribute vec4 a_color;
+            attribute vec2 a_texCoord;
+            
+            uniform float u_time;
+            uniform vec2 u_resolution;
+            
+            varying vec4 v_color;
+            varying vec2 v_texCoord;
+            
+            void main() {
+                // 添加简单的动画效果
+                vec2 pos = a_position.xy;
+                pos.x += sin(a_position.y * 3.0 + u_time) * 0.05;
+                
+                gl_Position = vec4(pos, a_position.z, a_position.w);
+                v_color = a_color;
+                v_texCoord = a_texCoord;
+            }
+        `;
+
+        // 片段着色器 - 基础
+        const fragmentShaderBasic = `
+            precision mediump float;
+            varying vec4 v_color;
+            
+            void main() {
+                gl_FragColor = v_color;
+            }
+        `;
+
+        // 片段着色器 - 渐变
+        const fragmentShaderGradient = `
+            precision mediump float;
+            varying vec4 v_color;
+            uniform float u_time;
+            
+            void main() {
+                vec3 color = v_color.rgb;
+                color += sin(u_time * 2.0) * 0.2;
+                gl_FragColor = vec4(color, v_color.a);
+            }
+        `;
+
+        // 片段着色器 - 图案
+        const fragmentShaderPattern = `
+            precision mediump float;
+            varying vec4 v_color;
+            varying vec2 v_texCoord;
+            uniform float u_time;
+            
+            void main() {
+                vec2 uv = v_texCoord;
+                
+                // 创建圆形图案
+                float dist = distance(uv, vec2(0.5));
+                float circle = smoothstep(0.4, 0.5, dist);
+                
+                // 添加动画效果
+                float pattern = sin(uv.x * 10.0 + u_time) * 
+                              cos(uv.y * 10.0 + u_time);
+                
+                vec3 color = v_color.rgb;
+                color += pattern * 0.1;
+                color = mix(color, vec3(1.0, 0.5, 0.5), circle);
+                
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
+        // 创建着色器程序
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('着色器编译失败:', gl.getShaderInfoLog(shader));
+                return null;
+            }
+            
+            return shader;
+        }
+
+        function createProgram(gl, vertexShader, fragmentShader) {
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+            
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('着色器程序链接失败:', gl.getProgramInfoLog(program));
+                return null;
+            }
+            
+            return program;
+        }
+
+        let currentProgram = null;
+        let currentShaderType = 'basic';
+        let animationEnabled = true;
+        let startTime = Date.now();
+
+        // WebGL 上下文和程序
+        let gl = null;
+        let programs = {};
+
+        function initWebGL() {
+            const canvas = document.getElementById('canvas');
+            gl = canvas.getContext('webgl2');
+            
+            if (!gl) {
+                alert('WebGL2 不被支持，请使用现代浏览器');
+                return false;
+            }
+
+            // 编译所有着色器
+            const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+            
+            programs.basic = createProgram(gl, vertexShader, 
+                createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderBasic));
+            programs.gradient = createProgram(gl, vertexShader, 
+                createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderGradient));
+            programs.pattern = createProgram(gl, vertexShader, 
+                createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderPattern));
+
+            if (!programs.basic || !programs.gradient || !programs.pattern) {
+                alert('着色器程序创建失败');
+                return false;
+            }
+
+            // 设置视口
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            // 创建顶点数据
+            const vertices = new Float32Array([
+                // 位置            // 颜色 (R,G,B,A)    // 纹理坐标
+                -0.8,  0.8,   1.0, 0.2, 0.5, 1.0,   0.0, 0.0,
+                 0.8,  0.8,   0.2, 1.0, 0.5, 1.0,   1.0, 0.0,
+                 0.8, -0.8,   0.5, 0.5, 1.0, 1.0,   1.0, 1.0,
+                -0.8, -0.8,   1.0, 1.0, 1.0,   0.0, 1.0,
+            ]);
+
+            const vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+            // 设置基础属性（所有程序通用）
+            return true;
+        }
+
+        function render() {
+            if (!gl || !currentProgram) return;
+
+            // 清空画布
+            gl.clearColor(0.1, 0.1, 0.15, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // 使用当前程序
+            gl.useProgram(currentProgram);
+
+            // 获取属性位置
+            const positionLoc = gl.getAttribLocation(currentProgram, 'a_position');
+            const colorLoc = gl.getAttribLocation(currentProgram, 'a_color');
+            const texCoordLoc = gl.getAttribLocation(currentProgram, 'a_texCoord');
+
+            // 设置顶点数据
+            gl.enableVertexAttribArray(positionLoc);
+            gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 32, 0);
+
+            gl.enableVertexAttribArray(colorLoc);
+            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 32, 8);
+
+            gl.enableVertexAttribArray(texCoordLoc);
+            gl.vertexAttribPointer(texCoordLoc, 2, gl.FLOAT, false, 32, 16);
+
+            // 设置 uniform（时间）
+            const timeLoc = gl.getUniformLocation(currentProgram, 'u_time');
+            const resLoc = gl.getUniformLocation(currentProgram, 'u_resolution');
+            
+            gl.uniform1f(timeLoc, (Date.now() - startTime) / 1000);
+            gl.uniform2f(resLoc, gl.canvas.width, gl.canvas.height);
+
+            // 绘制
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        function animate() {
+            render();
+            if (animationEnabled) {
+                requestAnimationFrame(animate);
+            }
+        }
+
+        window.changeShader = function(type) {
+            currentShaderType = type;
+            currentProgram = programs[type];
+            
+            const info = document.getElementById('shaderInfo');
+            const names = {
+                'basic': '基础着色器 - 简单的颜色渲染',
+                'gradient': '渐变着色器 - 带时间变化的颜色效果',
+                'pattern': '图案着色器 - 复杂的图案和动画'
+            };
+            info.textContent = names[type];
+        };
+
+        window.toggleAnimation = function() {
+            animationEnabled = !animationEnabled;
+            if (animationEnabled) {
+                animate();
+            }
+        };
+
+        // 初始化
+        if (initWebGL()) {
+            currentProgram = programs.basic;
+            animate();
+            console.log('✅ 着色器编程示例启动成功！');
+        }
+    </script>
+</body>
+</html>

@@ -20,17 +20,13 @@ export declare enum GeometryType {
  */
 export type Coordinate = [number, number];
 /**
- * 坐标数组
+ * 坐标数组（点或线的坐标序列）
  */
 export type Coordinates = Coordinate[];
 /**
- * 线坐标数组
+ * 几何坐标数据（支持所有类型的坐标）
  */
-export type LineCoordinates = Coordinates[];
-/**
- * 面坐标数组
- */
-export type PolygonCoordinates = Coordinates[][];
+export type GeometryCoordinates = Coordinate | Coordinates | Coordinates[] | Coordinates[][];
 /**
  * 几何数据
  */
@@ -38,7 +34,7 @@ export interface IGeometry {
     /** 几何类型 */
     type: GeometryType;
     /** 坐标数据 */
-    coordinates: Coordinates | LineCoordinates | PolygonCoordinates;
+    coordinates: GeometryCoordinates;
 }
 /**
  * 要素属性

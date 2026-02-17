@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光照效果 - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #ff6b6b;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .slider-container {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .slider-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider-label {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .slider-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ff6b6b;
+            margin-left: 10px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ff6b6b;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .info {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: #856404;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 光照效果 - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+        
+        <div class="controls">
+            <button onclick="setLighting('none')">无光照</button>
+            <button onclick="setLighting('directional')">方向光</button>
+            <button onclick="setLighting('point')">点光源</button>
+            <button onclick="setLighting('spot')">聚光灯</button>
+            <button onclick="toggleAnimation()">切换动画</button>
+        </div>
+
+        <div class="slider-container">
+            <div class="slider-item">
+                <div class="slider-label">光强度: <span class="slider-value" id="intensityValue">1.0</span></div>
+                <input type="range" id="intensity" min="0" max="2" step="0.1" value="1.0" oninput="updateIntensity()">
+            </div>
+            <div class="slider-item">
+                <div class="slider-label">光颜色 R: <span class="slider-value" id="rValue">1.0</span></div>
+                <input type="range" id="lightR" min="0" max="1" step="0.1" value="1.0" oninput="updateLightColor()">
+            </div>
+            <div class="slider-item">
+                <div class="slider-label">光颜色 G: <span class="slider-value" id="gValue">1.0</span></div>
+                <input type="range" id="lightG" min="0" max="1" step="0.1" value="1.0" oninput="updateLightColor()">
+            </div>
+            <div class="slider-item">
+                <div class="slider-label">光颜色 B: <span class="slider-value" id="bValue">1.0</span></div>
+                <input type="range" id="lightB" min="0" max="1" step="0.1" value="1.0" oninput="updateLightColor()">
+            </div>
+        </div>
+
+        <div class="info">
+            <strong>当前光照模式：</strong><span id="lightMode">方向光</span>
+        </div>
+    </div>
+
+    <script type="module">
+        // WebGL 上下文
+        let gl = null;
+        let program = null;
+        let lightingMode = 'directional';
+        let animationEnabled = true;
+        let time = 0;
+
+        // 光照参数
+        const lightParams = {
+            intensity: 1.0,
+            color: [1.0, 1.0, 1.0],
+            position: [2, 2, 2],
+            direction: [-1, -1, -1]
+        };
+
+        // 初始化 WebGL
+        function initWebGL() {
+            const canvas = document.getElementById('canvas');
+            gl = canvas.getContext('webgl2');
+            
+            if (!gl) {
+                alert('WebGL2 不被支持，请使用现代浏览器');
+                return false;
+            }
+
+            // 设置视口
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            // 启用深度测试
+            gl.enable(gl.DEPTH_TEST);
+
+            // 启用背面剔除
+            gl.enable(gl.CULL_FACE);
+
+            // 创建着色器程序
+            createShaders();
+
+            // 启动渲染循环
+            requestAnimationFrame(render);
+
+            console.log('✅ 光照效果示例启动成功！');
+            return true;
+        }
+
+        // 创建着色器
+        function createShaders() {
+            // 顶点着色器
+            const vertexShaderSource = `
+                attribute vec4 a_position;
+                attribute vec3 a_normal;
+                
+                uniform mat4 u_modelView;
+                uniform mat4 u_projection;
+                uniform mat4 u_normalMatrix;
+                
+                varying vec3 v_normal;
+                varying vec3 v_position;
+                
+                void main() {
+                    vec4 worldPosition = u_modelView * a_position;
+                    v_position = worldPosition.xyz;
+                    v_normal = (u_normalMatrix * vec4(a_normal, 0.0)).xyz;
+                    gl_Position = u_projection * worldPosition;
+                }
+            `;
+
+            // 片段着色器（支持多种光照）
+            const fragmentShaderSource = `
+                precision mediump float;
+                
+                varying vec3 v_normal;
+                varying vec3 v_position;
+                
+                uniform vec3 u_lightPosition;
+                uniform vec3 u_lightDirection;
+                uniform vec3 u_lightColor;
+                uniform float u_lightIntensity;
+                uniform vec3 u_objectColor;
+                uniform int u_lightingMode; // 0: none, 1: directional, 2: point, 3: spot
+                uniform vec3 u_viewPosition;
+                
+                void main() {
+                    vec3 normal = normalize(v_normal);
+                    vec3 color = u_objectColor;
+                    
+                    if (u_lightingMode == 1) {
+                        // 方向光
+                        vec3 lightDir = normalize(u_lightDirection);
+                        float diff = max(dot(normal, lightDir), 0.0);
+                        vec3 diffuse = diff * u_lightColor * u_lightIntensity;
+                        color += diffuse;
+                        
+                    } else if (u_lightingMode == 2) {
+                        // 点光源
+                        vec3 lightDir = normalize(u_lightPosition - v_position);
+                        float diff = max(dot(normal, lightDir), 0.0);
+                        
+                        // 衰减
+                        float distance = length(u_lightPosition - v_position);
+                        float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
+                        
+                        vec3 diffuse = diff * u_lightColor * u_lightIntensity * attenuation;
+                        color += diffuse;
+                        
+                    } else if (u_lightingMode == 3) {
+                        // 聚光灯
+                        vec3 lightDir = normalize(u_lightPosition - v_position);
+                        float diff = max(dot(normal, lightDir), 0.0);
+                        
+                        // 聚光灯锥角
+                        vec3 spotDir = normalize(u_lightDirection);
+                        float theta = dot(lightDir, -spotDir);
+                        float cutoff = 0.8;
+                        
+                        if (theta > cutoff) {
+                            float epsilon = 1.0 - cutoff;
+                            float intensity = clamp((theta - cutoff) / epsilon, 0.0, 1.0);
+                            
+                            // 衰减
+                            float distance = length(u_lightPosition - v_position);
+                            float attenuation = 1.0 / (1.0 + 0.09 * distance + 0.032 * distance * distance);
+                            
+                            vec3 diffuse = diff * u_lightColor * u_lightIntensity * attenuation * intensity;
+                            color += diffuse;
+                        }
+                    }
+                    
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `;
+
+            // 创建着色器
+            const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+            const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+            // 创建程序
+            program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('着色器程序链接失败:', gl.getProgramInfoLog(program));
+                return;
+            }
+        }
+
+        // 创建着色器
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('着色器编译失败:', gl.getShaderInfoLog(shader));
+                return null;
+            }
+            
+            return shader;
+        }
+
+        // 创建球体
+        function createSphere() {
+            const vertices = [];
+            const normals = [];
+            const indices = [];
+            
+            const radius = 1;
+            const segments = 32;
+            const rings = 32;
+            
+            for (let y = 0; y <= rings; y++) {
+                const phi = (y / rings) * Math.PI;
+                for (let x = 0; x <= segments; x++) {
+                    const theta = (x / segments) * Math.PI * 2;
+                    
+                    const px = radius * Math.sin(phi) * Math.cos(theta);
+                    const py = radius * Math.cos(phi);
+                    const pz = radius * Math.sin(phi) * Math.sin(theta);
+                    
+                    vertices.push(px, py, pz);
+                    
+                    // 法线（单位球体，法线就是归一化的位置）
+                    const len = Math.sqrt(px*px + py*py + pz*pz);
+                    normals.push(px/len, py/len, pz/len);
+                }
+            }
+            
+            for (let y = 0; y < rings; y++) {
+                for (let x = 0; x < segments; x++) {
+                    const first = y * (segments + 1) + x;
+                    const second = first + segments + 1;
+                    
+                    indices.push(first, second, first + 1);
+                    indices.push(second, second + 1, first + 1);
+                }
+            }
+            
+            return {
+                vertices: new Float32Array(vertices),
+                normals: new Float32Array(normals),
+                indices: new Uint16Array(indices)
+            };
+        }
+
+        // 矩阵工具函数
+        function perspective(fov, aspect, near, far) {
+            const f = 1.0 / Math.tan(fov / 2);
+            return new Float32Array([
+                f / aspect, 0, 0, 0,
+                0, f, 0, 0,
+                0, 0, (far + near) / (near - far), -1,
+                0, 0, (2 * far * near) / (near - far), 0
+            ]);
+        }
+
+        function multiply(a, b) {
+            const result = new Float32Array(16);
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    result[i * 4 + j] = 
+                        a[i * 4 + 0] * b[0 * 4 + j] +
+                        a[i * 4 + 1] * b[1 * 4 + j] +
+                        a[i * 4 + 2] * b[2 * 4 + j] +
+                        a[i * 4 + 3] * b[3 * 4 + j];
+                }
+            }
+            return result;
+        }
+
+        function translate(x, y, z) {
+            return new Float32Array([
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                x, y, z, 1
+            ]);
+        }
+
+        function invert4x4(m) {
+            const inv = new Float32Array(16);
+            inv[0] = m[5]*m[10]*m[15] - m[5]*m[11]*m[14] - m[9]*m[6]*m[15] + m[9]*m[7]*m[14] + m[13]*m[6]*m[11] - m[13]*m[7]*m[10];
+            inv[4] = -m[4]*m[10]*m[15] + m[4]*m[11]*m[14] + m[8]*m[6]*m[15] - m[8]*m[7]*m[14] - m[12]*m[6]*m[11] + m[12]*m[7]*m[10];
+            inv[8] = m[4]*m[9]*m[15] - m[4]*m[11]*m[13] - m[8]*m[5]*m[15] + m[8]*m[7]*m[13] + m[12]*m[5]*m[11] - m[12]*m[7]*m[9];
+            inv[12] = -m[4]*m[9]*m[14] + m[4]*m[10]*m[13] + m[8]*m[5]*m[14] - m[8]*m[6]*m[13] - m[12]*m[5]*m[10] + m[12]*m[6]*m[9];
+            inv[1] = -m[1]*m[10]*m[15] + m[1]*m[11]*m[14] + m[9]*m[2]*m[15] - m[9]*m[3]*m[14] - m[13]*m[2]*m[11] + m[13]*m[3]*m[10];
+            inv[5] = m[0]*m[10]*m[15] - m[0]*m[11]*m[14] - m[8]*m[2]*m[15] + m[8]*m[3]*m[14] + m[12]*m[2]*m[11] - m[12]*m[3]*m[10];
+            inv[9] = -m[0]*m[9]*m[15] + m[0]*m[11]*m[13] + m[8]*m[1]*m[15] - m[8]*m[3]*m[13] - m[12]*m[1]*m[11] + m[12]*m[3]*m[9];
+            inv[13] = m[0]*m[9]*m[14] - m[0]*m[10]*m[13] - m[8]*m[1]*m[14] + m[8]*m[2]*m[13] + m[12]*m[1]*m[10] - m[12]*m[2]*m[9];
+            inv[2] = m[1]*m[6]*m[15] - m[1]*m[7]*m[14] - m[5]*m[2]*m[15] + m[5]*m[3]*m[14] + m[13]*m[2]*m[7] - m[13]*m[3]*m[6];
+            inv[6] = -m[0]*m[6]*m[15] + m[0]*m[7]*m[14] + m[4]*m[2]*m[15] - m[4]*m[3]*m[14] - m[12]*m[2]*m[7] + m[12]*m[3]*m[6];
+            inv[10] = m[0]*m[5]*m[15] - m[0]*m[7]*m[13] - m[4]*m[1]*m[15] + m[4]*m[3]*m[13] + m[12]*m[1]*m[7] - m[12]*m[3]*m[5];
+            inv[14] = -m[0]*m[5]*m[14] + m[0]*m[6]*m[13] + m[4]*m[1]*m[14] - m[4]*m[2]*m[13] - m[12]*m[1]*m[6] + m[12]*m[2]*m[5];
+            inv[3] = -m[1]*m[6]*m[11] + m[1]*m[7]*m[10] + m[5]*m[2]*m[11] - m[5]*m[3]*m[10] - m[9]*m[2]*m[7] + m[9]*m[3]*m[6];
+            inv[7] = m[0]*m[6]*m[11] - m[0]*m[7]*m[10] - m[4]*m[2]*m[11] + m[4]*m[3]*m[10] + m[8]*m[2]*m[7] - m[8]*m[3]*m[6];
+            inv[11] = -m[0]*m[5]*m[11] + m[0]*m[7]*m[9] + m[4]*m[1]*m[11] - m[4]*m[3]*m[9] - m[8]*m[1]*m[7] + m[8]*m[3]*m[5];
+            inv[15] = m[0]*m[5]*m[10] - m[0]*m[6]*m[9] - m[4]*m[1]*m[10] + m[4]*m[2]*m[9] + m[8]*m[1]*m[6] - m[8]*m[2]*m[5];
+
+            let det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
+            det = 1.0 / det;
+
+            for (let i = 0; i < 16; i++) {
+                inv[i] *= det;
+            }
+
+            return inv;
+        }
+
+        function transpose4x4(m) {
+            return new Float32Array([
+                m[0], m[4], m[8], m[12],
+                m[1], m[5], m[9], m[13],
+                m[2], m[6], m[10], m[14],
+                m[3], m[7], m[11], m[15]
+            ]);
+        }
+
+        // 渲染函数
+        function render() {
+            if (!gl || !program) return;
+
+            // 清空画布
+            gl.clearColor(0.1, 0.1, 0.15, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            // 使用程序
+            gl.useProgram(program);
+
+            // 创建球体
+            const sphere = createSphere();
+
+            // 设置顶点数据
+            const vertexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, sphere.vertices, gl.STATIC_DRAW);
+
+            const normalBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, sphere.normals, gl.STATIC_DRAW);
+
+            const indexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, sphere.indices, gl.STATIC_DRAW);
+
+            // 设置属性
+            const positionLoc = gl.getAttribLocation(program, 'a_position');
+            const normalLoc = gl.getAttribLocation(program, 'a_normal');
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.enableVertexAttribArray(positionLoc);
+            gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+            gl.enableVertexAttribArray(normalLoc);
+            gl.vertexAttribPointer(normalLoc, 3, gl.FLOAT, false, 0, 0);
+
+            // 计算变换矩阵
+            const aspect = gl.canvas.width / gl.canvas.height;
+            const projection = perspective(Math.PI / 4, aspect, 0.1, 100);
+            
+            // 模型视图矩阵
+            let modelView = translate(0, 0, -4);
+
+            // 法线矩阵（用于正确变换法线）
+            const modelViewInv = invert4x4(modelView);
+            const normalMatrix = transpose4x4(modelViewInv);
+
+            // 设置 uniform
+            const projectionLoc = gl.getUniformLocation(program, 'u_projection');
+            const modelViewLoc = gl.getUniformLocation(program, 'u_modelView');
+            const normalMatrixLoc = gl.getUniformLocation(program, 'u_normalMatrix');
+
+            gl.uniformMatrix4fv(projectionLoc, false, projection);
+            gl.uniformMatrix4fv(modelViewLoc, false, modelView);
+            gl.uniformMatrix4fv(normalMatrixLoc, false, normalMatrix);
+
+            // 光照参数
+            const lightingModeMap = { 'none': 0, 'directional': 1, 'point': 2, 'spot': 3 };
+            const mode = lightingModeMap[lightingMode];
+            
+            // 动画更新光源位置
+            if (animationEnabled && lightingMode === 'point') {
+                time += 0.01;
+                lightParams.position = [
+                    Math.sin(time) * 3,
+                    Math.cos(time) * 2 + 2,
+                    Math.sin(time * 0.5) * 3 + 2
+                ];
+            }
+
+            gl.uniform1i(gl.getUniformLocation(program, 'u_lightingMode'), mode);
+            gl.uniform3f(gl.getUniformLocation(program, 'u_lightPosition'), 
+                        lightParams.position[0], lightParams.position[1], lightParams.position[2]);
+            gl.uniform3f(gl.getUniformLocation(program, 'u_lightDirection'), 
+                        lightParams.direction[0], lightParams.direction[1], lightParams.direction[2]);
+            gl.uniform3f(gl.getUniformLocation(program, 'u_lightColor'), 
+                        lightParams.color[0], lightParams.color[1], lightParams.color[2]);
+            gl.uniform1f(gl.getUniformLocation(program, 'u_lightIntensity'), lightParams.intensity);
+            gl.uniform3f(gl.getUniformLocation(program, 'u_objectColor'), 0.8, 0.2, 0.2);
+
+            // 绘制
+            gl.drawElements(gl.TRIANGLES, sphere.indices.length, gl.UNSIGNED_SHORT, 0);
+
+            // 清理
+            gl.deleteBuffer(vertexBuffer);
+            gl.deleteBuffer(normalBuffer);
+            gl.deleteBuffer(indexBuffer);
+
+            requestAnimationFrame(render);
+        }
+
+        // 全局函数
+        window.setLighting = function(mode) {
+            lightingMode = mode;
+            document.getElementById('lightMode').textContent = {
+                'none': '无光照',
+                'directional': '方向光',
+                'point': '点光源',
+                'spot': '聚光灯'
+            }[mode];
+        };
+
+        window.toggleAnimation = function() {
+            animationEnabled = !animationEnabled;
+        };
+
+        window.updateIntensity = function() {
+            lightParams.intensity = parseFloat(document.getElementById('intensity').value);
+            document.getElementById('intensityValue').textContent = lightParams.intensity.toFixed(1);
+        };
+
+        window.updateLightColor = function() {
+            lightParams.color[0] = parseFloat(document.getElementById('lightR').value);
+            lightParams.color[1] = parseFloat(document.getElementById('lightG').value);
+            lightParams.color[2] = parseFloat(document.getElementById('lightB').value);
+            
+            document.getElementById('rValue').textContent = lightParams.color[0].toFixed(1);
+            document.getElementById('gValue').textContent = lightParams.color[1].toFixed(1);
+            document.getElementById('bValue').textContent = lightParams.color[2].toFixed(1);
+        };
+
+        // 初始化
+        initWebGL();
+    </script>
+</body>
+</html>

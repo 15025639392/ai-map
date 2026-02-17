@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>栅格图层 - 高德卫星瓦片</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: white;
+            font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            background: #1a1a2e;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #canvas {
+            flex: 1;
+            display: block;
+            background: #0f0f1a;
+        }
+
+        .toolbar {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a1a2e;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #302b63;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        button.success {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .slider-container label {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        input[type="range"] {
+            flex: 2;
+            cursor: pointer;
+        }
+
+        .zoom-display {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #302b63;
+            margin: 10px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .tile-item {
+            padding: 8px;
+            background: white;
+            border-radius: 6px;
+            font-size: 12px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .tile-item.loading {
+            border-color: #ffc107;
+            background: #fff9e6;
+        }
+
+        .tile-item.loaded {
+            border-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        .tile-item.error {
+            border-color: #f44336;
+            background: #ffebee;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            color: white;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 25px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .info-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .badge-vec { background: #e3f2fd; color: #1976d2; }
+        .badge-ras { background: #f3e5f5; color: #7b1fa2; }
+    </style>
+</head>
+<body>
+    <!-- 加载界面 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div>正在初始化栅格图层...</div>
+        <div style="font-size: 14px; margin-top: 10px; color: #aaa;">加载高德卫星瓦片</div>
+    </div>
+
+    <header>
+        <h1>
+            <span>🛰️</span>
+            栅格图层 - 高德卫星瓦片
+        </h1>
+        <div>
+            <button class="secondary" onclick="toggleFullscreen()">全屏</button>
+            <button class="success" onclick="refreshTiles()">刷新瓦片</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="toolbar">
+                <button onclick="zoomIn()">放大</button>
+                <button onclick="zoomOut()">缩小</button>
+                <button class="secondary" onclick="resetZoom()">重置</button>
+                <div style="margin-left: auto; color: white; font-size: 13px;">
+                    <span>📍 高德卫星图</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">🗺️ 地图控制</div>
+                <div class="zoom-display" id="zoomDisplay">Zoom: 10</div>
+                <div class="slider-container">
+                    <label>缩放级别</label>
+                    <input type="range" id="zoomSlider" min="1" max="18" value="10" onchange="setZoom(this.value)">
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">📊 瓦片统计</div>
+                <div class="stat-item">
+                    <span class="stat-label">总瓦片数</span>
+                    <span class="stat-value" id="totalTiles">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">已加载</span>
+                    <span class="stat-value" id="loadedTiles">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">加载中</span>
+                    <span class="stat-value" id="loadingTiles">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">错误</span>
+                    <span class="stat-value" id="errorTiles">0</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">🧩 瓦片列表</div>
+                <div class="tile-grid" id="tileGrid">
+                    <!-- 瓦片列表将在这里动态生成 -->
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">ℹ️ 信息</div>
+                <div style="font-size: 13px; line-height: 1.6; color: #666;">
+                    <p style="margin-bottom: 8px;"><strong>数据源:</strong> 高德卫星图</p>
+                    <p style="margin-bottom: 8px;"><strong>图层类型:</strong> <span class="info-badge badge-ras">Raster</span></p>
+                    <p style="margin-bottom: 8px;"><strong>投影:</strong> Web Mercator</p>
+                    <p style="margin-bottom: 8px;"><strong>瓦片大小:</strong> 256x256</p>
+                    <p><strong>缩放范围:</strong> 1-18</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer, RasterLayer } from '../../lib/index.js';
+
+        // 应用状态
+        const AppState = {
+            renderer: null,
+            canvas: null,
+            rasterLayer: null,
+            zoom: 10
+        };
+
+        // 高德卫星瓦片URL模板
+        const GAODE_SATELLITE_URL = 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}';
+
+        // 初始化应用
+        async function initialize() {
+            try {
+                console.log('创建渲染器...');
+                AppState.renderer = new Renderer({
+                    targetFPS: 60,
+                    enableProfiling: true
+                });
+
+                AppState.canvas = document.getElementById('canvas');
+                AppState.canvas.width = AppState.canvas.parentElement.clientWidth;
+                AppState.canvas.height = AppState.canvas.parentElement.clientHeight - 70;
+
+                console.log('初始化 WebGL2 上下文...');
+                AppState.renderer.attachTo(AppState.canvas);
+
+                console.log('创建栅格图层...');
+                AppState.rasterLayer = new RasterLayer({
+                    name: '高德卫星图',
+                    tileUrl: GAODE_SATELLITE_URL,
+                    minZoom: 1,
+                    maxZoom: 18,
+                    zoom: AppState.zoom,
+                    tileSize: 256,
+                    crossOrigin: 'anonymous'
+                });
+
+                console.log('添加图层到渲染器...');
+                AppState.rasterLayer.add(AppState.renderer);
+
+                console.log('启动渲染循环...');
+                AppState.renderer.start();
+
+                console.log('初始化完成！');
+
+                // 隐藏加载界面
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 500);
+
+                // 启动更新循环
+                startUpdateLoop();
+
+                // 窗口大小改变事件
+                window.addEventListener('resize', handleResize);
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                alert('初始化失败: ' + error.message);
+            }
+        }
+
+        // 启动更新循环
+        function startUpdateLoop() {
+            setInterval(() => {
+                updateUI();
+            }, 100);
+        }
+
+        // 更新 UI
+        function updateUI() {
+            if (!AppState.rasterLayer) return;
+
+            const stats = AppState.rasterLayer.getStats();
+
+            document.getElementById('totalTiles').textContent = stats.totalTiles;
+            document.getElementById('loadedTiles').textContent = stats.loadedTiles;
+            document.getElementById('loadingTiles').textContent = stats.loadingTiles;
+            document.getElementById('errorTiles').textContent = stats.errorTiles;
+
+            updateTileGrid();
+        }
+
+        // 更新瓦片网格
+        function updateTileGrid() {
+            if (!AppState.rasterLayer) return;
+
+            const stats = AppState.rasterLayer.getStats();
+            const grid = document.getElementById('tileGrid');
+
+            // 如果瓦片数量相同，不更新
+            if (grid.children.length === stats.totalTiles) {
+                return;
+            }
+
+            // 清空并重建
+            grid.innerHTML = '';
+
+            // 添加一些示例瓦片项
+            const zoom = AppState.zoom;
+            for (let i = 0; i < Math.min(8, stats.totalTiles); i++) {
+                const x = Math.floor(i / 2);
+                const y = i % 2;
+                const tileItem = document.createElement('div');
+                tileItem.className = 'tile-item loading';
+                tileItem.innerHTML = `
+                    <div><strong>Tile ${zoom}-${x}-${y}</strong></div>
+                    <div style="font-size: 10px; color: #666; margin-top: 4px;">
+                        加载中...
+                    </div>
+                `;
+                grid.appendChild(tileItem);
+            }
+
+            // 模拟瓦片加载状态（实际应该从图层获取）
+            setTimeout(() => {
+                const items = grid.querySelectorAll('.tile-item');
+                items.forEach((item, index) => {
+                    if (index < 4) {
+                        item.className = 'tile-item loaded';
+                        item.innerHTML = `
+                            <div><strong>Tile ${zoom}-${Math.floor(index / 2)}-${index % 2}</strong></div>
+                            <div style="font-size: 10px; color: #4caf50; margin-top: 4px;">
+                                ✓ 已加载
+                            </div>
+                        `;
+                    }
+                });
+            }, 1000);
+        }
+
+        // 处理窗口大小改变
+        function handleResize() {
+            if (AppState.canvas && AppState.renderer) {
+                const container = AppState.canvas.parentElement;
+                AppState.canvas.width = container.clientWidth;
+                AppState.canvas.height = container.clientHeight - 70;
+                AppState.renderer.resize(AppState.canvas.width, AppState.canvas.height);
+            }
+        }
+
+        // 全局函数
+        window.zoomIn = () => {
+            if (AppState.zoom < 18) {
+                AppState.zoom = Math.min(18, AppState.zoom + 1);
+                updateZoom();
+            }
+        };
+
+        window.zoomOut = () => {
+            if (AppState.zoom > 1) {
+                AppState.zoom = Math.max(1, AppState.zoom - 1);
+                updateZoom();
+            }
+        };
+
+        window.resetZoom = () => {
+            AppState.zoom = 10;
+            updateZoom();
+        };
+
+        window.setZoom = (value) => {
+            AppState.zoom = parseInt(value);
+            updateZoom();
+        };
+
+        window.toggleFullscreen = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        };
+
+        window.refreshTiles = () => {
+            if (AppState.rasterLayer) {
+                AppState.rasterLayer.setTileUrl(GAODE_SATELLITE_URL);
+            }
+        };
+
+        // 更新缩放级别
+        function updateZoom() {
+            document.getElementById('zoomDisplay').textContent = `Zoom: ${AppState.zoom}`;
+            document.getElementById('zoomSlider').value = AppState.zoom;
+
+            if (AppState.rasterLayer) {
+                AppState.rasterLayer.setZoom(AppState.zoom);
+            }
+        }
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            if (AppState.renderer) {
+                AppState.renderer.stop();
+                AppState.renderer.dispose();
+            }
+            if (AppState.rasterLayer) {
+                AppState.rasterLayer.dispose();
+            }
+        });
+
+        // 启动应用
+        initialize();
+    </script>
+</body>
+</html>

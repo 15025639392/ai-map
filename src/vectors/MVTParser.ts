@@ -4,8 +4,6 @@ import {
   IGeometry,
   GeometryType,
   Coordinates,
-  LineCoordinates,
-  PolygonCoordinates,
   Coordinate,
 } from '../vectortypes.js';
 
@@ -121,7 +119,7 @@ export class MVTParser {
    * 解析线几何
    */
   private static parseLineGeometry(geometry: number[]): IGeometry {
-    const lines: LineCoordinates = [];
+    const lines: Coordinates[] = [];
     let currentLine: Coordinates = [];
 
     let x = 0;
@@ -176,8 +174,8 @@ export class MVTParser {
    * 解析面几何
    */
   private static parsePolygonGeometry(geometry: number[]): IGeometry {
-    const polygons: PolygonCoordinates = [];
-    let currentPolygon: LineCoordinates = [];
+    const polygons: Coordinates[][] = [];
+    let currentPolygon: Coordinates[] = [];
     let currentRing: Coordinates = [];
 
     let x = 0;

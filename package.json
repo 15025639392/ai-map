@@ -9,6 +9,16 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest watch",
+    "test:golden-image": "vitest run tests/renderer/golden-image.test.ts",
+    "test:generate-golden": "ts-node scripts/generate-golden-images.ts",
+    "test:update-golden": "ts-node scripts/update-golden-images.ts",
+    "test:stress": "vitest run tests/stress-test/stress-scenarios.test.ts",
+    "test:stress-run": "ts-node scripts/run-stress-test.ts",
+    "test:stress-quick": "ts-node scripts/run-stress-test.ts --quick",
+    "test:stress-stability": "ts-node scripts/run-stress-test.ts --stability",
+    "test:compatibility": "vitest run tests/compatibility/compatibility-scenarios.test.ts",
+    "test:compatibility-run": "ts-node scripts/run-compatibility-test.ts",
+    "test:release-gate": "ts-node scripts/check-release-gate.ts",
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "echo 'Linting not configured yet'"
@@ -26,6 +36,7 @@
     "typescript": "^5.3.0",
     "vitest": "^1.0.0",
     "@vitest/coverage-v8": "^1.0.0",
-    "jsdom": "^24.0.0"
+    "jsdom": "^24.0.0",
+    "ts-node": "^10.9.2"
   }
 }

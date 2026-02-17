@@ -190,7 +190,7 @@ export class VectorLayer extends Layer {
    * 渲染图层
    */
   render(renderer: IRenderer): void {
-    if (!this.visible || this._disposed) {
+    if (!this.visible || this.isDisposed()) {
       return;
     }
 
@@ -230,8 +230,7 @@ export class VectorLayer extends Layer {
    * 销毁图层
    */
   dispose(): void {
-    // @ts-ignore - 访问父类私有属性
-    if ((this as any)._disposed) {
+    if (this.isDisposed()) {
       return;
     }
 
@@ -250,8 +249,8 @@ export class VectorLayer extends Layer {
     // 清空要素
     this._features = [];
 
-    // @ts-ignore - 访问父类私有属性
-    (this as any)._disposed = true;
+    // 调用父类dispose
+    super.dispose();
   }
 
   /**
