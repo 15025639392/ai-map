@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地球模型 - 瓦片渲染示例</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            overflow: hidden;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        .controls h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: #a0a0a0;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #666 0%, #444 100%);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #333;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-switch input {
+            width: 50px;
+            height: 26px;
+            appearance: none;
+            background: #333;
+            border-radius: 13px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch input:checked {
+            background: #00d4ff;
+        }
+
+        .toggle-switch input::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch input:checked::after {
+            left: 26px;
+        }
+
+        .stats {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            min-width: 200px;
+        }
+
+        .stats h3 {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .stat-label {
+            color: #a0a0a0;
+        }
+
+        .stat-value {
+            color: #00ff88;
+            font-weight: bold;
+            font-family: monospace;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px 50px;
+            border-radius: 12px;
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.2em;
+            color: #00d4ff;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .zoom-display {
+            text-align: center;
+            font-size: 1.5em;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div id="loading" class="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在初始化地球模型...</div>
+    </div>
+
+    <div class="controls">
+        <h2>🌍 地球模型控制</h2>
+
+        <div class="control-group">
+            <label>缩放控制</label>
+            <div class="zoom-display" id="zoomDisplay">Level 0</div>
+            <div class="control-row">
+                <button onclick="zoomOut()">➖ 缩小</button>
+                <button onclick="zoomIn()">➕ 放大</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>缩放级别: <span id="zoomValue">0</span></label>
+            <input type="range" id="zoomSlider" min="0" max="18" value="0" oninput="setZoom(this.value)">
+        </div>
+
+        <div class="control-group">
+            <label>显示选项</label>
+            <div class="toggle-switch">
+                <input type="checkbox" id="wireframe" onchange="toggleWireframe(this.checked)">
+                <span>线框模式</span>
+            </div>
+            <div class="toggle-switch" style="margin-top: 10px;">
+                <input type="checkbox" id="lighting" checked onchange="toggleLighting(this.checked)">
+                <span>启用光照</span>
+            </div>
+            <div class="toggle-switch" style="margin-top: 10px;">
+                <input type="checkbox" id="atmosphere" checked onchange="toggleAtmosphere(this.checked)">
+                <span>大气散射</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>瓦片管理</label>
+            <div class="control-row">
+                <button class="secondary" onclick="reloadTiles()">🔄 重新加载</button>
+                <button class="secondary" onclick="clearCache()">🗑️ 清除缓存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats">
+        <h3>📊 性能统计</h3>
+        <div class="stat-item">
+            <span class="stat-label">顶点数:</span>
+            <span class="stat-value" id="vertexCount">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">三角形数:</span>
+            <span class="stat-value" id="triangleCount">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">已加载瓦片:</span>
+            <span class="stat-value" id="loadedTiles">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">当前缩放:</span>
+            <span class="stat-value" id="currentZoom">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">LOD 层级:</span>
+            <span class="stat-value" id="currentLOD">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fps">0</span>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer, EarthRenderer } from '../../lib/index.js';
+
+        let renderer = null;
+        let earthRenderer = null;
+
+        async function initialize() {
+            try {
+                console.log('🚀 正在初始化渲染器...');
+
+                // 创建渲染器
+                renderer = new Renderer({ targetFPS: 60 });
+                console.log('✅ 渲染器创建成功');
+
+                const canvas = document.getElementById('canvas');
+                if (!canvas) {
+                    throw new Error('Canvas 元素未找到');
+                }
+                console.log('✅ Canvas 元素找到，尺寸:', canvas.width, 'x', canvas.height);
+
+                renderer.attachTo(canvas);
+                console.log('✅ 渲染器已附加到 Canvas');
+
+                // 创建地球渲染器
+                earthRenderer = new EarthRenderer(renderer);
+                console.log('✅ 地球渲染器创建成功');
+
+                // 配置地球选项
+                const earthOptions = {
+                    name: 'Earth',
+                    visible: true,
+                    geometry: {
+                        radius: 1.0, // 缩小地球半径到合适尺寸
+                        widthSegments: 64,
+                        heightSegments: 32,
+                        generateUVs: true,
+                        generateNormals: true
+                    },
+                    tiles: {
+                        minZoom: 0,
+                        maxZoom: 18,
+                        tileSize: 256,
+                        tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        maxCacheSize: 100,
+                        enableLOD: true,
+                        lodThreshold: 2.0
+                    },
+                    render: {
+                        wireframe: false,
+                        cullFace: true,
+                        enableAtmosphere: true,
+                        atmosphereColor: [0.2, 0.4, 0.8, 0.3],
+                        enableLighting: true,
+                        lightDirection: [1.0, 0.5, 0.5],
+                        lightIntensity: 1.2
+                    },
+                    initialZoom: 0
+                };
+
+                console.log('🌍 开始初始化地球...');
+
+                // 初始化地球
+                await earthRenderer.initialize(earthOptions);
+
+                console.log('✅ 地球初始化完成');
+
+                // 启动渲染
+                renderer.start();
+                console.log('✅ 渲染循环已启动');
+
+                // 隐藏加载动画
+                document.getElementById('loading').classList.add('hidden');
+
+                // 更新 UI
+                updateUI();
+                startStatsUpdate();
+
+                // 添加事件监听
+                earthRenderer.on('initialized', () => {
+                    console.log('🎉 地球初始化事件触发');
+                });
+
+                console.log('🎉 所有初始化完成！');
+            } catch (error) {
+                console.error('❌ 初始化失败:', error);
+                console.error('错误堆栈:', error.stack);
+                const loadingText = document.getElementById('loading-text');
+                if (loadingText) {
+                    loadingText.textContent = '初始化失败: ' + error.message;
+                }
+            }
+        }
+
+        function updateUI() {
+            if (!earthRenderer) return;
+
+            const stats = earthRenderer.getStats();
+            
+            document.getElementById('vertexCount').textContent = stats.vertexCount.toLocaleString();
+            document.getElementById('triangleCount').textContent = stats.triangleCount.toLocaleString();
+            document.getElementById('loadedTiles').textContent = stats.loadedTiles;
+            document.getElementById('currentZoom').textContent = stats.currentZoom;
+            document.getElementById('currentLOD').textContent = stats.currentLOD;
+            document.getElementById('fps').textContent = stats.fps;
+
+            const zoom = earthRenderer.getZoom();
+            document.getElementById('zoomValue').textContent = zoom;
+            document.getElementById('zoomDisplay').textContent = 'Level ' + zoom;
+            document.getElementById('zoomSlider').value = zoom;
+        }
+
+        function startStatsUpdate() {
+            setInterval(() => {
+                if (earthRenderer) {
+                    updateUI();
+                }
+            }, 1000);
+        }
+
+        // 全局函数
+        window.zoomIn = function() {
+            if (earthRenderer) {
+                earthRenderer.zoomIn();
+                updateUI();
+            }
+        };
+
+        window.zoomOut = function() {
+            if (earthRenderer) {
+                earthRenderer.zoomOut();
+                updateUI();
+            }
+        };
+
+        window.setZoom = function(value) {
+            if (earthRenderer) {
+                earthRenderer.setZoom(parseInt(value));
+                updateUI();
+            }
+        };
+
+        window.toggleWireframe = function(enabled) {
+            if (earthRenderer) {
+                earthRenderer.setWireframe(enabled);
+            }
+        };
+
+        window.toggleLighting = function(enabled) {
+            if (earthRenderer) {
+                earthRenderer.setLighting(enabled);
+            }
+        };
+
+        window.toggleAtmosphere = function(enabled) {
+            if (earthRenderer) {
+                earthRenderer.setAtmosphere(enabled);
+            }
+        };
+
+        window.reloadTiles = function() {
+            if (earthRenderer) {
+                earthRenderer.reloadTiles();
+            }
+        };
+
+        window.clearCache = function() {
+            if (earthRenderer) {
+                earthRenderer.clearTileCache();
+                updateUI();
+            }
+        };
+
+        // 键盘控制
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '+' || e.key === '=') {
+                window.zoomIn();
+            } else if (e.key === '-') {
+                window.zoomOut();
+            }
+        });
+
+        // 启动
+        initialize();
+    </script>
+</body>
+</html>

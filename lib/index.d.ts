@@ -28,4 +28,6 @@ export { TileRequestManager } from './tiles/TileRequestManager.js';
 export { TileStats } from './tiles/TileStats.js';
 export type { ITileCoord, TileState, ITile, TileLoadFunction, ITileRequestConfig, ITileQueueConfig, ITileStats, TileQueueEvent, TileQueueEventListener } from './tiles/types.js';
 export * from './vectortypes.js';
+export { EarthGeometry, EarthTileLayer, EarthRenderer } from './earth/index.js';
+export type { IEarthGeometryConfig, IEarthTileConfig, IEarthRenderConfig, IEarthLayerOptions, TileTexture, LODLevel, IEarthStats, Vertex3D, UVCoord, SphericalCoord } from './earth/index.js';
 //# sourceMappingURL=index.d.ts.map

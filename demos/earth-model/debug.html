@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地球模型 - 调试版本</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: white;
+            overflow: hidden;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .debug-panel h3 {
+            color: #0f0;
+            margin-bottom: 10px;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #333;
+        }
+
+        .log-entry.info { border-color: #0af; }
+        .log-entry.success { border-color: #0f0; }
+        .log-entry.error { border-color: #f00; }
+        .log-entry.warning { border-color: #ff0; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="debug-panel">
+        <h3>🔍 调试日志</h3>
+        <div id="debug-log"></div>
+    </div>
+
+    <script type="module">
+        // 简单的日志工具
+        const debugLog = document.getElementById('debug-log');
+        
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `[${time}] ${message}`;
+            debugLog.appendChild(entry);
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        try {
+            log('🚀 开始初始化...', 'info');
+
+            // 检查 WebGL 支持
+            const canvas = document.getElementById('canvas');
+            if (!canvas) {
+                throw new Error('Canvas 元素未找到');
+            }
+            log('✅ Canvas 元素找到', 'success');
+
+            const gl = canvas.getContext('webgl2');
+            if (!gl) {
+                throw new Error('WebGL2 不支持');
+            }
+            log('✅ WebGL2 上下文创建成功', 'success');
+
+            // 设置 Canvas 尺寸
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            log(`📐 Canvas 尺寸: ${canvas.width} x ${canvas.height}`, 'info');
+
+            // 清空画布（设置为黑色背景）
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            log('🎨 画布已清空', 'info');
+
+            // 尝试导入模块
+            log('📦 加载模块...', 'info');
+            const module = await import('../../lib/index.js');
+            log('✅ 模块加载成功', 'success');
+
+            // 检查导出
+            if (module.Renderer) {
+                log('✅ Renderer 类已导出', 'success');
+            } else {
+                log('❌ Renderer 类未找到', 'error');
+            }
+
+            if (module.EarthRenderer) {
+                log('✅ EarthRenderer 类已导出', 'success');
+            } else {
+                log('❌ EarthRenderer 类未找到', 'error');
+            }
+
+            // 创建渲染器
+            log('🎮 创建渲染器...', 'info');
+            const renderer = new module.Renderer({ targetFPS: 60 });
+            log('✅ 渲染器创建成功', 'success');
+
+            renderer.attachTo(canvas);
+            log('✅ 渲染器已附加到 Canvas', 'success');
+
+            // 创建地球渲染器
+            log('🌍 创建地球渲染器...', 'info');
+            const earthRenderer = new module.EarthRenderer(renderer);
+            log('✅ 地球渲染器创建成功', 'success');
+
+            // 配置地球选项
+            const earthOptions = {
+                name: 'Earth',
+                visible: true,
+                geometry: {
+                    radius: 1.0,
+                    widthSegments: 64,
+                    heightSegments: 32,
+                    generateUVs: true,
+                    generateNormals: true
+                },
+                tiles: {
+                    minZoom: 0,
+                    maxZoom: 18,
+                    tileSize: 256,
+                    tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    maxCacheSize: 100,
+                    enableLOD: true,
+                    lodThreshold: 2.0
+                },
+                render: {
+                    wireframe: false,
+                    cullFace: true,
+                    enableAtmosphere: true,
+                    atmosphereColor: [0.2, 0.4, 0.8, 0.3],
+                    enableLighting: true,
+                    lightDirection: [1.0, 0.5, 0.5],
+                    lightIntensity: 1.2
+                },
+                initialZoom: 0
+            };
+
+            log('🔧 地球配置:', 'info');
+            log(`   半径: ${earthOptions.geometry.radius}`, 'info');
+            log(`   宽分段: ${earthOptions.geometry.widthSegments}`, 'info');
+            log(`   高分段: ${earthOptions.geometry.heightSegments}`, 'info');
+
+            // 初始化地球
+            log('⏳ 初始化地球（异步）...', 'info');
+            await earthRenderer.initialize(earthOptions);
+            log('✅ 地球初始化完成', 'success');
+
+            // 启动渲染
+            log('▶️ 启动渲染循环...', 'info');
+            renderer.start();
+            log('✅ 渲染循环已启动', 'success');
+
+            // 获取统计信息
+            setTimeout(() => {
+                try {
+                    const stats = earthRenderer.getStats();
+                    log('📊 统计信息:', 'info');
+                    log(`   顶点数: ${stats.vertexCount}`, 'info');
+                    log(`   三角形数: ${stats.triangleCount}`, 'info');
+                    log(`   已加载瓦片: ${stats.loadedTiles}`, 'info');
+                    log(`   当前缩放: ${stats.currentZoom}`, 'info');
+                    log(`   LOD 层级: ${stats.currentLOD}`, 'info');
+                } catch (e) {
+                    log(`❌ 获取统计信息失败: ${e.message}`, 'error');
+                }
+            }, 1000);
+
+            // 定期更新日志
+            setInterval(() => {
+                try {
+                    const stats = earthRenderer.getStats();
+                    if (stats.fps > 0) {
+                        log(`📈 FPS: ${stats.fps}`, 'info');
+                    }
+                } catch (e) {
+                    // 忽略错误
+                }
+            }, 2000);
+
+            log('🎉 初始化全部完成！', 'success');
+
+        } catch (error) {
+            log(`❌ 错误: ${error.message}`, 'error');
+            log(`📋 堆栈: ${error.stack}`, 'error');
+        }
+    </script>
+</body>
+</html>

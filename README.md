@@ -53,16 +53,17 @@ new VectorLayer({
 
 ### Demo 示例
 
+- 🎯 **[Demo 主入口](demos/index.html)** ⭐ - 所有示例的可视化主页（推荐）
 - 🚀 [完整应用示例](demos/full-application/) - 展示完整的应用架构
 - 🗺️ [栅格图层](demos/raster-layer/) - 高德卫星瓦片示例
-- 🔵 [矢量图层](demos/vectors/) - GeoJSON 和 MVT 数据渲染
+- 🔵 [矢量图层](demos/vector-layer/) - GeoJSON 数据渲染
 - 🎮 [着色器编程](demos/shader-programming/) - 自定义着色器
 - 🖼️ [纹理映射](demos/texture-mapping/) - 纹理使用技巧
 - 📹 [相机控制](demos/camera-controls/) - 3D 相机操作
 - 💡 [光照效果](demos/lighting/) - 光照模型实现
 - 📊 [性能监控](demos/performance-monitoring/) - 性能分析工具
 
-查看 [Demo 目录](demos/README.md) 获取所有示例。
+查看 [Demo 目录](demos/README.md) 获取所有示例和详细文档。
 
 ### 开发指南
 

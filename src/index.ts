@@ -81,3 +81,18 @@ export type {
 
 // 导出所有矢量类型
 export * from './vectortypes.js';
+
+// 导出地球模型
+export { EarthGeometry, EarthTileLayer, EarthRenderer } from './earth/index.js';
+export type {
+  IEarthGeometryConfig,
+  IEarthTileConfig,
+  IEarthRenderConfig,
+  IEarthLayerOptions,
+  TileTexture,
+  LODLevel,
+  IEarthStats,
+  Vertex3D,
+  UVCoord,
+  SphericalCoord
+} from './earth/index.js';
