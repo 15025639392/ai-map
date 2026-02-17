@@ -170,7 +170,70 @@ npx vite serve demos/lighting
 
 ---
 
-### 9. 栅格图层 (`raster-layer/`) ⭐ NEW
+### 9. 矢量图层 (`vector-layer/`) ⭐ NEW
+
+展示如何使用 `VectorLayer` 类加载和渲染 GeoJSON 数据。
+
+**学习内容：**
+- GeoJSON 数据加载（点、线、面）
+- 矢量样式配置和切换
+- 要素列表管理
+- 实时渲染统计
+- 要素拾取交互
+- 响应式布局
+
+**适合人群：** 地图应用开发者
+
+**运行命令：**
+```bash
+npx vite serve demos/vector-layer
+```
+
+---
+
+### 10. 控件系统 (`controls/`) ⭐ NEW
+
+展示如何使用控件系统，包括 EventBus、LayerManager、NavigationControl 和 PerformanceMonitor。
+
+**学习内容：**
+- 事件总线的使用
+- 图层批量管理
+- 导航控件集成
+- 性能监控实现
+- 事件日志记录
+- 交互控制
+
+**适合人群：** 需要构建复杂应用的开发者
+
+**运行命令：**
+```bash
+npx vite serve demos/controls
+```
+
+---
+
+### 11. 瓦片队列 (`tile-queue/`) ⭐ NEW
+
+展示如何使用 `TileQueue` 类智能加载和管理地图瓦片。
+
+**学习内容：**
+- 智能瓦片加载
+- 并发控制
+- LRU 缓存策略
+- 自动重试机制
+- 实时性能统计
+- 动态配置管理
+
+**适合人群：** 需要高效加载瓦片的开发者
+
+**运行命令：**
+```bash
+npx vite serve demos/tile-queue
+```
+
+---
+
+### 12. 栅格图层 (`raster-layer/`) ⭐ NEW
 
 展示如何使用栅格图层加载和渲染高德地图卫星瓦片。
 

@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>控件系统 - 控件示例</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #canvas {
+            flex: 1;
+            display: block;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            flex: 1;
+            min-width: 80px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        button.success {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #f44336 0%, #da190b 100%);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+
+        .event-log {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        .event-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .event-time {
+            color: #666;
+            margin-right: 8px;
+        }
+
+        .event-type {
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .event-data {
+            color: #333;
+        }
+
+        .layer-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .layer-item {
+            padding: 10px;
+            background: #f5f5f5;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .layer-item.inactive {
+            border-left-color: #ccc;
+            opacity: 0.6;
+        }
+
+        .layer-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .layer-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .mini-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            min-width: auto;
+        }
+
+        .performance-display {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .perf-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .perf-label {
+            color: #666;
+        }
+
+        .perf-value {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .toolbar {
+            background: #f5f5f5;
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .zoom-display {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            min-width: 60px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载界面 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div>正在初始化控件系统...</div>
+    </div>
+
+    <header>
+        <h1>
+            <span>🎛️</span>
+            控件系统示例
+        </h1>
+        <div>
+            <button class="secondary" onclick="toggleFullscreen()">全屏</button>
+            <button class="danger" onclick="clearLogs()">清除日志</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="toolbar">
+                <div class="control-group">
+                    <button onclick="zoomIn()">放大 +</button>
+                    <div class="zoom-display" id="zoomDisplay">10</div>
+                    <button onclick="zoomOut()">缩小 -</button>
+                </div>
+                <div class="control-group">
+                    <button onclick="moveUp()">↑</button>
+                    <button onclick="moveLeft()">←</button>
+                    <button onclick="moveDown()">↓</button>
+                    <button onclick="moveRight()">→</button>
+                </div>
+                <div class="control-group">
+                    <button onclick="resetNavigation()">重置</button>
+                    <button onclick="flyTo()">飞行</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">📚 图层管理</div>
+                <div class="control-group">
+                    <button class="success" onclick="addLayer()">添加图层</button>
+                    <button class="danger" onclick="removeLayer()">移除图层</button>
+                </div>
+                <div class="layer-list" id="layerList">
+                    <!-- 图层列表将在这里动态生成 -->
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">📊 性能监控</div>
+                <div class="performance-display">
+                    <div class="perf-item">
+                        <span class="perf-label">FPS</span>
+                        <span class="perf-value" id="fps">0</span>
+                    </div>
+                    <div class="perf-item">
+                        <span class="perf-label">帧时间</span>
+                        <span class="perf-value" id="frameTime">0ms</span>
+                    </div>
+                    <div class="perf-item">
+                        <span class="perf-label">内存</span>
+                        <span class="perf-value" id="memory">0MB</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">📝 事件日志</div>
+                <div class="event-log" id="eventLog">
+                    <div class="event-item">
+                        <span class="event-time">--:--:--</span>
+                        <span class="event-type">INFO</span>
+                        <span class="event-data">系统初始化...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import {
+            Renderer,
+            Layer,
+            EventBus,
+            LayerManager,
+            PerformanceMonitor,
+            NavigationControl
+        } from '../../lib/index.js';
+
+        // 应用状态
+        const AppState = {
+            renderer: null,
+            canvas: null,
+            eventBus: null,
+            layerManager: null,
+            performanceMonitor: null,
+            navigationControl: null,
+            layers: [],
+            layerCounter: 0,
+            zoom: 10,
+            center: [116.397428, 39.90923]
+        };
+
+        // 初始化应用
+        async function initialize() {
+            try {
+                console.log('创建事件总线...');
+                AppState.eventBus = new EventBus();
+                AppState.eventBus.on('*', handleEvent);
+
+                console.log('创建渲染器...');
+                AppState.renderer = new Renderer({
+                    targetFPS: 60,
+                    enableProfiling: true
+                });
+
+                AppState.canvas = document.getElementById('canvas');
+                AppState.canvas.width = AppState.canvas.parentElement.clientWidth;
+                AppState.canvas.height = AppState.canvas.parentElement.clientHeight - 130;
+
+                console.log('初始化 WebGL2 上下文...');
+                AppState.renderer.attachTo(AppState.canvas);
+
+                console.log('创建图层管理器...');
+                AppState.layerManager = new LayerManager();
+
+                console.log('创建导航控件...');
+                AppState.navigationControl = new NavigationControl(AppState.eventBus, {
+                    duration: 300
+                });
+
+                console.log('创建性能监控...');
+                AppState.performanceMonitor = new PerformanceMonitor();
+
+                // 创建一些示例图层
+                createSampleLayers();
+
+                console.log('启动渲染循环...');
+                AppState.renderer.start();
+
+                console.log('初始化完成！');
+                logEvent('SYSTEM', '应用初始化完成');
+
+                // 隐藏加载界面
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 500);
+
+                // 启动更新循环
+                startUpdateLoop();
+
+                // 窗口大小改变事件
+                window.addEventListener('resize', handleResize);
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                alert('初始化失败: ' + error.message);
+            }
+        }
+
+        // 创建示例图层
+        function createSampleLayers() {
+            const layerNames = ['基础图层', '叠加图层', '标注图层'];
+            const layerColors = ['#4CAF50', '#2196F3', '#FF9800'];
+
+            layerNames.forEach((name, index) => {
+                const layer = new Layer({
+                    name: name,
+                    priority: 10 - index,
+                    visible: true
+                });
+
+                AppState.layers.push(layer);
+                AppState.layerManager.addLayer(layer);
+
+                logEvent('LAYER', `创建图层: ${name}`, {
+                    layerId: layer.id,
+                    priority: layer.priority,
+                    color: layerColors[index]
+                });
+            });
+
+            updateLayerList();
+        }
+
+        // 更新图层列表
+        function updateLayerList() {
+            const list = document.getElementById('layerList');
+            list.innerHTML = '';
+
+            AppState.layers.forEach((layer, index) => {
+                const item = document.createElement('div');
+                item.className = 'layer-item' + (layer.visible ? '' : ' inactive');
+                item.innerHTML = `
+                    <span class="layer-name">${layer.name}</span>
+                    <div class="layer-actions">
+                        <button class="mini-btn secondary" onclick="toggleLayer(${index})">
+                            ${layer.visible ? '隐藏' : '显示'}
+                        </button>
+                        <button class="mini-btn danger" onclick="deleteLayer(${index})">删除</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // 事件处理器
+        function handleEvent(event) {
+            const time = new Date().toLocaleTimeString();
+
+            console.log(`[${time}] ${event.type}:`, event.data);
+            logEvent(event.type, JSON.stringify(event.data));
+        }
+
+        // 记录事件
+        function logEvent(type, data, extra = {}) {
+            const log = document.getElementById('eventLog');
+            const entry = document.createElement('div');
+            entry.className = 'event-item';
+
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `
+                <span class="event-time">${time}</span>
+                <span class="event-type">${type}</span>
+                <span class="event-data">${data}</span>
+            `;
+
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+
+            // 限制日志数量
+            while (log.children.length > 50) {
+                log.removeChild(log.firstChild);
+            }
+        }
+
+        // 导航操作
+        function zoomIn() {
+            AppState.zoom = Math.min(18, AppState.zoom + 1);
+            updateZoomDisplay();
+            AppState.navigationControl?.zoomIn();
+            logEvent('NAVIGATION', `放大至 ${AppState.zoom}`);
+        }
+
+        function zoomOut() {
+            AppState.zoom = Math.max(1, AppState.zoom - 1);
+            updateZoomDisplay();
+            AppState.navigationControl?.zoomOut();
+            logEvent('NAVIGATION', `缩小至 ${AppState.zoom}`);
+        }
+
+        function moveUp() {
+            AppState.center[1] += 0.1;
+            AppState.navigationControl?.pan('up');
+            logEvent('NAVIGATION', '向上平移');
+        }
+
+        function moveDown() {
+            AppState.center[1] -= 0.1;
+            AppState.navigationControl?.pan('down');
+            logEvent('NAVIGATION', '向下平移');
+        }
+
+        function moveLeft() {
+            AppState.center[0] -= 0.1;
+            AppState.navigationControl?.pan('left');
+            logEvent('NAVIGATION', '向左平移');
+        }
+
+        function moveRight() {
+            AppState.center[0] += 0.1;
+            AppState.navigationControl?.pan('right');
+            logEvent('NAVIGATION', '向右平移');
+        }
+
+        function resetNavigation() {
+            AppState.zoom = 10;
+            AppState.center = [116.397428, 39.90923];
+            updateZoomDisplay();
+            logEvent('NAVIGATION', '重置导航');
+        }
+
+        function flyTo() {
+            if (AppState.navigationControl) {
+                AppState.navigationControl.flyTo({
+                    center: [116.397428, 39.90923],
+                    zoom: 12
+                });
+                logEvent('NAVIGATION', '飞行到指定位置');
+            }
+        }
+
+        function updateZoomDisplay() {
+            document.getElementById('zoomDisplay').textContent = AppState.zoom;
+        }
+
+        // 图层操作
+        function addLayer() {
+            const layer = new Layer({
+                name: `新图层 ${AppState.layerCounter++}`,
+                priority: 10,
+                visible: true
+            });
+
+            AppState.layers.push(layer);
+            AppState.layerManager.addLayer(layer);
+            updateLayerList();
+            logEvent('LAYER', `添加图层: ${layer.name}`);
+        }
+
+        function removeLayer() {
+            if (AppState.layers.length === 0) {
+                alert('没有可移除的图层');
+                return;
+            }
+
+            const layer = AppState.layers.pop();
+            if (layer) {
+                AppState.layerManager.removeLayer(layer.id);
+                updateLayerList();
+                logEvent('LAYER', `移除图层: ${layer.name}`);
+            }
+        }
+
+        function toggleLayer(index) {
+            const layer = AppState.layers[index];
+            if (layer) {
+                if (layer.visible) {
+                    layer.hide();
+                    logEvent('LAYER', `隐藏图层: ${layer.name}`);
+                } else {
+                    layer.show();
+                    logEvent('LAYER', `显示图层: ${layer.name}`);
+                }
+                updateLayerList();
+            }
+        }
+
+        function deleteLayer(index) {
+            if (confirm('确定要删除此图层吗？')) {
+                const layer = AppState.layers[index];
+                if (layer) {
+                    layer.dispose();
+                    AppState.layers.splice(index, 1);
+                    updateLayerList();
+                    logEvent('LAYER', `删除图层: ${layer.name}`);
+                }
+            }
+        }
+
+        // 清除日志
+        function clearLogs() {
+            document.getElementById('eventLog').innerHTML = '';
+            logEvent('SYSTEM', '日志已清除');
+        }
+
+        // 全屏切换
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // 处理窗口大小改变
+        function handleResize() {
+            if (AppState.canvas && AppState.renderer) {
+                const container = AppState.canvas.parentElement;
+                AppState.canvas.width = container.clientWidth;
+                AppState.canvas.height = container.clientHeight - 130;
+                AppState.renderer.resize(AppState.canvas.width, AppState.canvas.height);
+            }
+        }
+
+        // 启动更新循环
+        function startUpdateLoop() {
+            setInterval(() => {
+                // 更新性能监控
+                if (AppState.performanceMonitor) {
+                    AppState.performanceMonitor.update();
+                    const stats = AppState.performanceMonitor.getStats();
+
+                    document.getElementById('fps').textContent = stats.fps.toFixed(1);
+                    document.getElementById('frameTime').textContent = stats.frameTime.toFixed(2) + 'ms';
+                    document.getElementById('memory').textContent = stats.memoryUsage.toFixed(1) + 'MB';
+                }
+            }, 100);
+        }
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            if (AppState.renderer) {
+                AppState.renderer.stop();
+                AppState.renderer.dispose();
+            }
+            AppState.layers.forEach(layer => layer.dispose());
+        });
+
+        // 启动应用
+        initialize();
+    </script>
+</body>
+</html>

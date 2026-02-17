@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瓦片队列 - 瓦片管理示例</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #canvas {
+            flex: 1;
+            display: block;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #4e54c8;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            margin: 5px;
+            flex: 1;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+        }
+
+        button.success {
+            background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .tile-item {
+            padding: 8px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 11px;
+            border-left: 4px solid #ccc;
+            transition: all 0.2s;
+        }
+
+        .tile-item:hover {
+            background: #e0e0e0;
+            transform: translateX(2px);
+        }
+
+        .tile-item.pending {
+            border-left-color: #ffc107;
+            background: #fff9e6;
+        }
+
+        .tile-item.loading {
+            border-left-color: #17a2b8;
+            background: #e7f5ff;
+        }
+
+        .tile-item.loaded {
+            border-left-color: #4caf50;
+            background: #e8f5e9;
+        }
+
+        .tile-item.failed {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+
+        .tile-coord {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .tile-status {
+            color: #666;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .toolbar {
+            background: #f5f5f5;
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .slider-container label {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        input[type="range"] {
+            flex: 2;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载界面 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div>正在初始化瓦片队列...</div>
+    </div>
+
+    <header>
+        <h1>
+            <span>📦</span>
+            瓦片队列 - 瓦片管理示例
+        </h1>
+        <div>
+            <button class="secondary" onclick="toggleFullscreen()">全屏</button>
+            <button class="success" onclick="startLoading()">开始加载</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="toolbar">
+                <div class="slider-container">
+                    <label>缩放级别 (1-18)</label>
+                    <input type="range" id="zoomSlider" min="1" max="18" value="10" onchange="handleZoomChange(this.value)">
+                </div>
+                <div class="slider-container">
+                    <label>并发数 (1-10)</label>
+                    <input type="range" id="concurrentSlider" min="1" max="10" value="4" onchange="handleConcurrentChange(this.value)">
+                </div>
+                <button onclick="clearQueue()">清空队列</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">📊 瓦片统计</div>
+                <div class="stat-item">
+                    <span class="stat-label">总请求数</span>
+                    <span class="stat-value" id="totalRequests">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">成功数</span>
+                    <span class="stat-value" id="successRequests">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">失败数</span>
+                    <span class="stat-value" id="failedRequests">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">平均加载时间</span>
+                    <span class="stat-value" id="avgLoadTime">0ms</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">队列长度</span>
+                    <span class="stat-value" id="queueLength">0</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">🧩 瓦片列表</div>
+                <div class="tile-grid" id="tileGrid">
+                    <!-- 瓦片列表将在这里动态生成 -->
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">ℹ️ 信息</div>
+                <div style="font-size: 13px; line-height: 1.6; color: #666;">
+                    <p style="margin-bottom: 8px;"><strong>瓦片源:</strong> OpenStreetMap</p>
+                    <p style="margin-bottom: 8px;"><strong>队列管理:</strong> 智能优先级</p>
+                    <p style="margin-bottom: 8px;"><strong>缓存策略:</strong> LRU 缓存</p>
+                    <p><strong>重试机制:</strong> 自动重试失败瓦片</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import {
+            Renderer,
+            TileQueue,
+            TileState,
+            Layer
+        } from '../../lib/index.js';
+
+        // 应用状态
+        const AppState = {
+            renderer: null,
+            canvas: null,
+            tileQueue: null,
+            tileLayer: null,
+            zoom: 10,
+            maxConcurrent: 4,
+            tiles: [],
+            updateInterval: null
+        };
+
+        // 瓦片 URL 模板
+        const TILE_URL_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+        // 初始化应用
+        async function initialize() {
+            try {
+                console.log('创建瓦片队列...');
+                AppState.tileQueue = new TileQueue({
+                    loadFn: async (tile) => {
+                        return await loadTile(tile);
+                    },
+                    maxConcurrent: AppState.maxConcurrent,
+                    maxRetries: 3,
+                    retryDelayBase: 1000,
+                    retryDelayMax: 5000,
+                    requestTimeout: 30000,
+                    enablePriority: true,
+                    enableLRU: true,
+                    maxCacheSize: 100
+                });
+
+                // 监听瓦片事件
+                AppState.tileQueue.on('tileRequested', (tile) => {
+                    console.log('瓦片请求:', tile.coord);
+                    updateTileStatus(tile, TileState.LOADING);
+                });
+
+                AppState.tileQueue.on('tileLoaded', (tile) => {
+                    console.log('瓦片加载完成:', tile.coord, '时间:', tile.loadTime + 'ms');
+                    updateTileStatus(tile, TileState.LOADED);
+                    updateTileStats();
+                });
+
+                AppState.tileQueue.on('tileFailed', (tile) => {
+                    console.error('瓦片加载失败:', tile.coord, tile.lastError);
+                    updateTileStatus(tile, TileState.FAILED);
+                    updateTileStats();
+                });
+
+                console.log('创建渲染器...');
+                AppState.renderer = new Renderer({
+                    targetFPS: 60,
+                    enableProfiling: true
+                });
+
+                AppState.canvas = document.getElementById('canvas');
+                AppState.canvas.width = AppState.canvas.parentElement.clientWidth;
+                AppState.canvas.height = AppState.canvas.parentElement.clientHeight - 80;
+
+                console.log('初始化 WebGL2 上下文...');
+                AppState.renderer.attachTo(AppState.canvas);
+
+                console.log('创建瓦片图层...');
+                AppState.tileLayer = new Layer({
+                    name: 'Tile Layer',
+                    priority: 10,
+                    visible: true
+                });
+
+                AppState.tileLayer.add(AppState.renderer);
+
+                console.log('启动渲染循环...');
+                AppState.renderer.start();
+
+                console.log('初始化完成！');
+                updateStats();
+
+                // 隐藏加载界面
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 500);
+
+                // 启动更新循环
+                startUpdateLoop();
+
+                // 窗口大小改变事件
+                window.addEventListener('resize', handleResize);
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                alert('初始化失败: ' + error.message);
+            }
+        }
+
+        // 加载瓦片
+        async function loadTile(tile) {
+            const startTime = performance.now();
+
+            try {
+                const url = TILE_URL_TEMPLATE
+                    .replace('{z}', tile.coord.z.toString())
+                    .replace('{x}', tile.coord.x.toString())
+                    .replace('{y}', tile.coord.y.toString());
+
+                const response = await fetch(url, {
+                    signal: AbortSignal.timeout(30000)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const blob = await response.blob();
+                const bitmap = await createImageBitmap(blob);
+
+                const loadTime = performance.now() - startTime;
+
+                console.log(`瓦片 ${tile.coord.z}/${tile.coord.x}/${tile.coord.y} 加载完成`, {
+                    loadTime: loadTime,
+                    size: blob.size
+                });
+
+                return {
+                    image: bitmap,
+                    loadTime: loadTime
+                };
+
+            } catch (error) {
+                console.error(`瓦片 ${tile.coord.z}/${tile.coord.x}/${tile.coord.y} 加载失败:`, error);
+                throw error;
+            }
+        }
+
+        // 更新瓦片状态
+        function updateTileStatus(tile, status) {
+            tile.state = status;
+
+            // 查找或创建瓦片项
+            let item = AppState.tiles.find(t => 
+                t.coord.x === tile.coord.x && 
+                t.coord.y === tile.coord.y && 
+                t.coord.z === tile.coord.z
+            );
+
+            if (!item) {
+                item = {
+                    coord: tile.coord,
+                    state: status
+                };
+                AppState.tiles.push(item);
+            } else {
+                item.state = status;
+            }
+
+            updateTileGrid();
+        }
+
+        // 更新瓦片网格
+        function updateTileGrid() {
+            const grid = document.getElementById('tileGrid');
+            grid.innerHTML = '';
+
+            AppState.tiles.forEach(tile => {
+                const item = document.createElement('div');
+                item.className = `tile-item ${tile.state}`;
+                item.innerHTML = `
+                    <div class="tile-coord">z:${tile.coord.z} x:${tile.coord.x} y:${tile.coord.y}</div>
+                    <div class="tile-status">${tile.state}</div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        // 更新统计
+        function updateStats() {
+            if (!AppState.tileQueue) return;
+
+            const stats = AppState.tileQueue.getStats();
+
+            document.getElementById('totalRequests').textContent = stats.totalRequests;
+            document.getElementById('successRequests').textContent = stats.successRequests;
+            document.getElementById('failedRequests').textContent = stats.failedRequests;
+            document.getElementById('avgLoadTime').textContent = stats.averageLoadTime.toFixed(0) + 'ms';
+            document.getElementById('queueLength').textContent = stats.queueLength;
+        }
+
+        // 启动加载
+        function startLoading() {
+            if (!AppState.tileQueue) return;
+
+            // 清空当前瓦片
+            AppState.tiles = [];
+
+            // 生成可见瓦片
+            const zoom = AppState.zoom;
+            const tiles = [];
+
+            for (let x = 0; x < 4; x++) {
+                for (let y = 0; y < 4; y++) {
+                    const tile = {
+                        coord: {
+                            x: x,
+                            y: y,
+                            z: zoom
+                        },
+                        state: TileState.PENDING
+                    };
+                    tiles.push(tile);
+                    AppState.tileQueue.add(tile.coord);
+                    updateTileStatus(tile, TileState.PENDING);
+                }
+            }
+
+            console.log(`已生成 ${tiles.length} 个瓦片`);
+        }
+
+        // 清空队列
+        function clearQueue() {
+            if (!AppState.tileQueue) return;
+
+            AppState.tileQueue.clear();
+            AppState.tiles = [];
+            updateTileGrid();
+            updateStats();
+
+            console.log('队列已清空');
+        }
+
+        // 处理缩放改变
+        function handleZoomChange(value) {
+            AppState.zoom = parseInt(value);
+            console.log('缩放级别:', AppState.zoom);
+        }
+
+        // 处理并发数改变
+        function handleConcurrentChange(value) {
+            AppState.maxConcurrent = parseInt(value);
+            if (AppState.tileQueue) {
+                AppState.tileQueue.setConfig({ maxConcurrent: AppState.maxConcurrent });
+                console.log('最大并发数:', AppState.maxConcurrent);
+            }
+        }
+
+        // 启动更新循环
+        function startUpdateLoop() {
+            AppState.updateInterval = setInterval(() => {
+                updateStats();
+            }, 1000);
+        }
+
+        // 处理窗口大小改变
+        function handleResize() {
+            if (AppState.canvas && AppState.renderer) {
+                const container = AppState.canvas.parentElement;
+                AppState.canvas.width = container.clientWidth;
+                AppState.canvas.height = container.clientHeight - 80;
+                AppState.renderer.resize(AppState.canvas.width, AppState.canvas.height);
+            }
+        }
+
+        // 全屏切换
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            if (AppState.renderer) {
+                AppState.renderer.stop();
+                AppState.renderer.dispose();
+            }
+            if (AppState.updateInterval) {
+                clearInterval(AppState.updateInterval);
+            }
+            if (AppState.tileQueue) {
+                AppState.tileQueue.clear();
+            }
+            if (AppState.tileLayer) {
+                AppState.tileLayer.dispose();
+            }
+        });
+
+        // 启动应用
+        initialize();
+    </script>
+</body>
+</html>

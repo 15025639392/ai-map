@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>矢量图层 - GeoJSON 示例</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #canvas {
+            flex: 1;
+            display: block;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        .stat-label {
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            margin: 5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .feature-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .feature-item {
+            padding: 12px;
+            background: #f5f5f5;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 4px solid #667eea;
+        }
+
+        .feature-item:hover {
+            background: #e0e0e0;
+            transform: translateX(4px);
+        }
+
+        .feature-item.selected {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+
+        .feature-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .feature-type {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .toolbar {
+            background: #f5f5f5;
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载界面 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div>正在初始化矢量图层...</div>
+        <div style="font-size: 14px; margin-top: 10px; color: #aaa;">加载 GeoJSON 数据</div>
+    </div>
+
+    <header>
+        <h1>
+            <span>🔵</span>
+            矢量图层 - GeoJSON 示例
+        </h1>
+        <div>
+            <button class="secondary" onclick="toggleFullscreen()">全屏</button>
+            <button class="success" onclick="loadData()">加载数据</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="toolbar">
+                <button onclick="changeStyle('default')">默认样式</button>
+                <button onclick="changeStyle('red')">红色样式</button>
+                <button onclick="changeStyle('green')">绿色样式</button>
+                <button onclick="changeStyle('blue')">蓝色样式</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">📊 渲染统计</div>
+                <div class="stat-item">
+                    <span class="stat-label">要素总数</span>
+                    <span class="stat-value" id="totalFeatures">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">点要素</span>
+                    <span class="stat-value" id="pointFeatures">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">线要素</span>
+                    <span class="stat-value" id="lineFeatures">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">面要素</span>
+                    <span class="stat-value" id="polygonFeatures">0</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">📍 要素列表</div>
+                <div class="feature-list" id="featureList">
+                    <!-- 要素列表将在这里动态生成 -->
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">ℹ️ 信息</div>
+                <div style="font-size: 13px; line-height: 1.6; color: #666;">
+                    <p style="margin-bottom: 8px;"><strong>数据源:</strong> GeoJSON</p>
+                    <p style="margin-bottom: 8px;"><strong>图层类型:</strong> <span class="badge">Vector</span></p>
+                    <p style="margin-bottom: 8px;"><strong>支持类型:</strong> Point, Line, Polygon</p>
+                    <p><strong>交互:</strong> 点击要素查看详情</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer, VectorLayer } from '../../lib/index.js';
+
+        // 应用状态
+        const AppState = {
+            renderer: null,
+            canvas: null,
+            vectorLayer: null,
+            geojson: null,
+            selectedFeature: null
+        };
+
+        // 示例 GeoJSON 数据
+        const sampleGeoJSON = {
+            type: 'FeatureCollection',
+            features: [
+                {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [116.397428, 39.90923]
+                    },
+                    properties: { name: '北京', type: 'city', population: 21540000 }
+                },
+                {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [121.473701, 31.230416]
+                    },
+                    properties: { name: '上海', type: 'city', population: 24280000 }
+                },
+                {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [
+                            [116.397428, 39.90923],
+                            [121.473701, 31.230416]
+                        ]
+                    },
+                    properties: { name: '北京-上海高铁', type: 'railway', length: '1318km' }
+                },
+                {
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [[
+                            [116.3, 39.85],
+                            [116.5, 39.85],
+                            [116.5, 39.95],
+                            [116.3, 39.95]
+                        ]]
+                    },
+                    properties: { name: '北京区域', type: 'area', area: '150km²' }
+                }
+            ]
+        };
+
+        // 样式配置
+        const styleConfigs = {
+            default: {
+                fillColor: '#4CAF50',
+                fillOpacity: 0.6,
+                strokeColor: '#2E7D32',
+                strokeWidth: 2,
+                pointRadius: 10,
+                pointColor: '#FF5722'
+            },
+            red: {
+                fillColor: '#FFCDD2',
+                fillOpacity: 0.6,
+                strokeColor: '#EF5350',
+                strokeWidth: 3,
+                pointRadius: 12,
+                pointColor: '#D32F2F'
+            },
+            green: {
+                fillColor: '#C8E6C9',
+                fillOpacity: 0.6,
+                strokeColor: '#43A047',
+                strokeWidth: 3,
+                pointRadius: 12,
+                pointColor: '#1B5E20'
+            },
+            blue: {
+                fillColor: '#BBDEFB',
+                fillOpacity: 0.6,
+                strokeColor: '#1976D2',
+                strokeWidth: 3,
+                pointRadius: 12,
+                pointColor: '#0D47A1'
+            }
+        };
+
+        // 初始化应用
+        async function initialize() {
+            try {
+                console.log('创建渲染器...');
+                AppState.renderer = new Renderer({
+                    targetFPS: 60,
+                    enableProfiling: true
+                });
+
+                AppState.canvas = document.getElementById('canvas');
+                AppState.canvas.width = AppState.canvas.parentElement.clientWidth;
+                AppState.canvas.height = AppState.canvas.parentElement.clientHeight - 70;
+
+                console.log('初始化 WebGL2 上下文...');
+                AppState.renderer.attachTo(AppState.canvas);
+
+                console.log('创建矢量图层...');
+                AppState.vectorLayer = new VectorLayer({
+                    name: 'GeoJSON Layer',
+                    dataSourceType: 'geojson',
+                    geojsonData: sampleGeoJSON,
+                    style: styleConfigs.default
+                });
+
+                AppState.vectorLayer.add(AppState.renderer);
+
+                console.log('启动渲染循环...');
+                AppState.renderer.start();
+
+                console.log('初始化完成！');
+                updateStats();
+                updateFeatureList();
+
+                // 隐藏加载界面
+                setTimeout(() => {
+                    document.getElementById('loadingOverlay').classList.add('hidden');
+                }, 500);
+
+                // 添加点击事件
+                AppState.canvas.addEventListener('click', handleCanvasClick);
+
+            } catch (error) {
+                console.error('初始化失败:', error);
+                alert('初始化失败: ' + error.message);
+            }
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            if (!AppState.vectorLayer) return;
+
+            const stats = AppState.vectorLayer.getRenderStats();
+            document.getElementById('totalFeatures').textContent = stats.featuresRendered;
+            document.getElementById('pointFeatures').textContent = stats.pointsRendered;
+            document.getElementById('lineFeatures').textContent = stats.linesRendered;
+            document.getElementById('polygonFeatures').textContent = stats.polygonsRendered;
+        }
+
+        // 更新要素列表
+        function updateFeatureList() {
+            if (!AppState.vectorLayer) return;
+
+            const features = AppState.vectorLayer.getFeatures();
+            const list = document.getElementById('featureList');
+            list.innerHTML = '';
+
+            features.forEach(feature => {
+                const item = document.createElement('div');
+                item.className = 'feature-item';
+                
+                const geometryType = feature.geometry.type;
+                const geometryName = {
+                    point: '点',
+                    multi_point: '多点',
+                    line: '线',
+                    multi_line: '多线',
+                    polygon: '面',
+                    multi_polygon: '多面'
+                }[geometryType] || geometryType;
+
+                item.innerHTML = `
+                    <div class="feature-name">${feature.properties?.name || '未命名'}</div>
+                    <div class="feature-type">${geometryName}</div>
+                `;
+
+                item.addEventListener('click', () => selectFeature(feature, item));
+                list.appendChild(item);
+            });
+        }
+
+        // 选择要素
+        function selectFeature(feature, element) {
+            // 移除其他选中状态
+            document.querySelectorAll('.feature-item.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            // 添加选中状态
+            element.classList.add('selected');
+            AppState.selectedFeature = feature;
+
+            console.log('选中要素:', feature);
+        }
+
+        // 处理画布点击
+        function handleCanvasClick(event) {
+            if (!AppState.vectorLayer) return;
+
+            const rect = AppState.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            console.log('点击坐标:', x, y);
+
+            // 这里可以实现要素拾取
+            // 目前仅显示提示
+            console.log('要素拾取功能需要完整的 WebGL 实现');
+        }
+
+        // 改变样式
+        function changeStyle(styleName) {
+            if (!AppState.vectorLayer) return;
+
+            const style = styleConfigs[styleName];
+            if (style) {
+                AppState.vectorLayer.setStyle(style);
+                console.log('样式已更改为:', styleName);
+            }
+        }
+
+        // 加载数据
+        function loadData() {
+            if (!AppState.vectorLayer) return;
+
+            // 模拟加载新数据
+            const newGeoJSON = {
+                type: 'FeatureCollection',
+                features: [
+                    {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [113.264434, 23.129162]
+                        },
+                        properties: { name: '广州', type: 'city' }
+                    },
+                    {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [114.169361, 22.319303]
+                        },
+                        properties: { name: '深圳', type: 'city' }
+                    },
+                    {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: [
+                                [113.264434, 23.129162],
+                                [114.169361, 22.319303]
+                            ]
+                        },
+                        properties: { name: '广深铁路', type: 'railway' }
+                    }
+                ]
+            };
+
+            AppState.vectorLayer.loadGeoJSON(newGeoJSON);
+            updateStats();
+            updateFeatureList();
+
+            console.log('新数据已加载');
+            alert('已加载新数据！');
+        }
+
+        // 全屏切换
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // 窗口大小改变
+        window.addEventListener('resize', () => {
+            if (AppState.canvas && AppState.renderer) {
+                const container = AppState.canvas.parentElement;
+                AppState.canvas.width = container.clientWidth;
+                AppState.canvas.height = container.clientHeight - 70;
+                AppState.renderer.resize(AppState.canvas.width, AppState.canvas.height);
+            }
+        });
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            if (AppState.renderer) {
+                AppState.renderer.stop();
+                AppState.renderer.dispose();
+            }
+            if (AppState.vectorLayer) {
+                AppState.vectorLayer.dispose();
+            }
+        });
+
+        // 启动应用
+        initialize();
+    </script>
+</body>
+</html>
