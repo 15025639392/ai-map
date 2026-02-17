@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能监控 - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .stats-panel {
+            margin-top: 20px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-unit {
+            font-size: 12px;
+            color: #999;
+            margin-left: 4px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .chart {
+            height: 120px;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            background: linear-gradient(to top, #f5f5f5 0%, #f5f5f5 100%);
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 5px;
+            overflow: hidden;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background: linear-gradient(to top, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+            transition: height 0.3s;
+            min-height: 2px;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .history-table th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+
+        .history-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .status-good {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .status-warning {
+            color: #ff9800;
+            font-weight: bold;
+        }
+
+        .status-bad {
+            color: #f44336;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 性能监控 - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+
+        <div class="controls">
+            <button onclick="increaseLoad()">增加负载</button>
+            <button onclick="decreaseLoad()">减少负载</button>
+            <button onclick="togglePause()">暂停/恢复</button>
+            <button onclick="clearHistory()">清空历史</button>
+        </div>
+
+        <div class="stats-panel">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">FPS</div>
+                    <div class="stat-value" id="fps">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">帧时间</div>
+                    <div class="stat-value" id="frameTime">0<span class="stat-unit">ms</span></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">节点数</div>
+                    <div class="stat-value" id="nodeCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">资源数</div>
+                    <div class="stat-value" id="resourceCount">0</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">FPS 历史趋势（最近 60 帧）</div>
+                <div class="chart" id="fpsChart"></div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">帧时间历史趋势（最近 60 帧）</div>
+                <div class="chart" id="frameTimeChart"></div>
+            </div>
+
+            <h3>性能历史记录</h3>
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>FPS</th>
+                        <th>帧时间 (ms)</th>
+                        <th>节点数</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer } from '../../lib/index.js';
+
+        // 创建渲染器
+        const renderer = new Renderer({
+            targetFPS: 60,
+            enableProfiling: true
+        });
+
+        // 获取画布
+        const canvas = document.getElementById('canvas');
+
+        // 性能历史数据
+        const fpsHistory = [];
+        const frameTimeHistory = [];
+        const performanceLog = [];
+        const maxHistoryLength = 60;
+
+        // 当前负载等级
+        let currentLoadLevel = 5;
+        let isPaused = false;
+
+        try {
+            // 附加到画布
+            renderer.attachTo(canvas);
+
+            // 创建初始节点
+            createNodes(currentLoadLevel);
+
+            // 启动渲染循环
+            renderer.start();
+
+            console.log('✅ 性能监控示例启动成功！');
+
+            // 更新性能监控
+            setInterval(updatePerformanceMonitor, 100);
+
+            // 全局函数
+            window.increaseLoad = () => {
+                if (currentLoadLevel < 50) {
+                    currentLoadLevel += 5;
+                    addNodes(5);
+                    console.log(`负载增加到 ${currentLoadLevel}`);
+                }
+            };
+
+            window.decreaseLoad = () => {
+                if (currentLoadLevel > 0) {
+                    currentLoadLevel -= 5;
+                    removeNodes(5);
+                    console.log(`负载减少到 ${currentLoadLevel}`);
+                }
+            };
+
+            window.togglePause = () => {
+                isPaused = !isPaused;
+                if (isPaused) {
+                    renderer.pause();
+                    console.log('⏸️ 渲染已暂停');
+                } else {
+                    renderer.resume();
+                    console.log('▶️ 渲染已恢复');
+                }
+            };
+
+            window.clearHistory = () => {
+                fpsHistory.length = 0;
+                frameTimeHistory.length = 0;
+                performanceLog.length = 0;
+                updateCharts();
+                updateHistoryTable();
+                console.log('🗑️ 历史记录已清空');
+            };
+
+        } catch (error) {
+            console.error('❌ 初始化失败:', error);
+            alert('WebGL2 不被支持，请使用现代浏览器');
+        }
+
+        // 创建节点
+        function createNodes(count) {
+            for (let i = 0; i < count; i++) {
+                const node = {
+                    id: `node-${Date.now()}-${i}`,
+                    priority: Math.floor(Math.random() * 20),
+                    visible: true,
+                    render: (renderer) => {
+                        const gl = renderer.gl;
+                        gl.clearColor(Math.random(), Math.random(), Math.random(), 1.0);
+                        gl.clear(gl.COLOR_BUFFER_BIT);
+
+                        // 模拟一些渲染工作
+                        simulateWork(currentLoadLevel);
+                    }
+                };
+                renderer.addNode(node);
+            }
+        }
+
+        // 添加节点
+        function addNodes(count) {
+            createNodes(count);
+        }
+
+        // 移除节点
+        function removeNodes(count) {
+            const stats = renderer.getStats();
+            if (!stats) return;
+
+            const nodesToRemove = Math.min(count, stats.nodeCount);
+            for (let i = 0; i < nodesToRemove; i++) {
+                // 移除第一个节点（简化处理）
+                const pipeline = renderer.pipeline;
+                const info = pipeline.getVisibleNodeCount();
+                if (info > 0) {
+                    const nodeId = `node-${i}`;
+                    renderer.removeNode(nodeId);
+                }
+            }
+        }
+
+        // 模拟渲染工作负载
+        function simulateWork(loadLevel) {
+            const iterations = loadLevel * 10;
+            let result = 0;
+            for (let i = 0; i < iterations; i++) {
+                result += Math.sin(i) * Math.cos(i);
+            }
+            return result;
+        }
+
+        // 更新性能监控
+        function updatePerformanceMonitor() {
+            const stats = renderer.getStats();
+            if (!stats) return;
+
+            // 更新显示
+            document.getElementById('fps').textContent = stats.fps;
+            document.getElementById('frameTime').innerHTML = `${stats.frameTime.toFixed(2)}<span class="stat-unit">ms</span>`;
+            document.getElementById('nodeCount').textContent = stats.nodeCount;
+            document.getElementById('resourceCount').textContent = stats.resourceCount;
+
+            // 更新历史数据
+            fpsHistory.push(stats.fps);
+            frameTimeHistory.push(stats.frameTime);
+
+            // 限制历史长度
+            if (fpsHistory.length > maxHistoryLength) {
+                fpsHistory.shift();
+                frameTimeHistory.shift();
+            }
+
+            // 更新图表
+            updateCharts();
+
+            // 记录性能日志（每 1 秒一次）
+            if (performanceLog.length === 0 ||
+                Date.now() - performanceLog[performanceLog.length - 1].timestamp >= 1000) {
+                performanceLog.push({
+                    timestamp: Date.now(),
+                    fps: stats.fps,
+                    frameTime: stats.frameTime,
+                    nodeCount: stats.nodeCount
+                });
+
+                // 限制日志长度
+                if (performanceLog.length > 20) {
+                    performanceLog.shift();
+                }
+
+                updateHistoryTable();
+            }
+        }
+
+        // 更新图表
+        function updateCharts() {
+            updateChart('fpsChart', fpsHistory, 60, '#4caf50');
+            updateChart('frameTimeChart', frameTimeHistory, 33, '#ff9800');
+        }
+
+        // 更新单个图表
+        function updateChart(elementId, data, maxValue, color) {
+            const container = document.getElementById(elementId);
+            if (!container) return;
+
+            // 如果没有数据，显示空状态
+            if (data.length === 0) {
+                container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">无数据</div>';
+                return;
+            }
+
+            // 计算每个条形的高度
+            const bars = data.map(value => {
+                const height = (value / maxValue) * 100;
+                const statusClass = height >= 80 ? 'status-bad' : height >= 60 ? 'status-warning' : 'status-good';
+                return `<div class="chart-bar" style="height: ${height}%;" title="${value.toFixed(1)}"></div>`;
+            });
+
+            container.innerHTML = bars.join('');
+        }
+
+        // 更新历史表格
+        function updateHistoryTable() {
+            const tbody = document.getElementById('historyBody');
+            const logData = [...performanceLog].reverse().slice(0, 10);
+
+            if (logData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">暂无记录</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = logData.map(log => {
+                const time = new Date(log.timestamp).toLocaleTimeString();
+                const statusClass = log.fps >= 50 ? 'status-good' : log.fps >= 30 ? 'status-warning' : 'status-bad';
+                const statusText = log.fps >= 50 ? '优秀' : log.fps >= 30 ? '良好' : '需要优化';
+
+                return `
+                    <tr>
+                        <td>${time}</td>
+                        <td>${log.fps}</td>
+                        <td>${log.frameTime.toFixed(2)}</td>
+                        <td>${log.nodeCount}</td>
+                        <td class="${statusClass}">${statusText}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            renderer.dispose();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>完整应用示例 - WebGL2 渲染引擎</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        #canvas-container {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #canvas {
+            flex: 1;
+            border-radius: 8px 8px 0 0;
+            display: block;
+        }
+
+        .toolbar {
+            background: #f5f5f5;
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+            border-radius: 0 0 8px 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.success {
+            background: #4caf50;
+        }
+
+        button.danger {
+            background: #f44336;
+        }
+
+        .log-container {
+            flex: 1;
+            overflow-y: auto;
+            background: #2d2d2d;
+            color: #f5f5f5;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 10px;
+            max-height: 300px;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .log-time {
+            color: #888;
+            margin-right: 8px;
+        }
+
+        .log-info { color: #64b5f6; }
+        .log-success { color: #4caf50; }
+        .log-warning { color: #ff9800; }
+        .log-error { color: #f44336; }
+
+        .scene-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .scene-item {
+            padding: 8px 12px;
+            background: #f5f5f5;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .scene-item:hover {
+            background: #e0e0e0;
+        }
+
+        .scene-item.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .scene-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .mini-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            color: white;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载界面 -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div>正在初始化 WebGL2 渲染引擎...</div>
+    </div>
+
+    <header>
+        <h1>🎨 WebGL2 渲染引擎 - 完整应用示例</h1>
+        <div>
+            <button class="secondary" onclick="toggleFullscreen()">全屏</button>
+            <button class="danger" onclick="exportStats()">导出统计</button>
+        </div>
+    </header>
+
+    <div class="main-content">
+        <div id="canvas-container">
+            <canvas id="canvas"></canvas>
+            <div class="toolbar">
+                <button onclick="addObject()">添加对象</button>
+                <button onclick="removeObject()">移除对象</button>
+                <button onclick="clearScene()">清空场景</button>
+                <button class="success" onclick="saveScene()">保存场景</button>
+                <button class="secondary" onclick="loadScene()">加载场景</button>
+                <button class="secondary" onclick="toggleAnimation()">切换动画</button>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">📊 性能统计</div>
+                <div class="stat-item">
+                    <span class="stat-label">FPS</span>
+                    <span class="stat-value" id="fps">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">帧时间</span>
+                    <span class="stat-value" id="frameTime">0 ms</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">对象数</span>
+                    <span class="stat-value" id="objectCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">资源数</span>
+                    <span class="stat-value" id="resourceCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">运行时间</span>
+                    <span class="stat-value" id="runtime">0s</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">🎬 场景列表</div>
+                <div class="scene-list" id="sceneList">
+                    <div class="scene-item active">
+                        <span>默认场景</span>
+                    </div>
+                </div>
+                <button style="width: 100%; margin-top: 10px;" onclick="createScene()">创建新场景</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">📝 日志</div>
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry">
+                        <span class="log-time">--:--:--</span>
+                        <span class="log-info">系统初始化中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer } from '../../lib/index.js';
+
+        // 应用状态
+        const AppState = {
+            renderer: null,
+            canvas: null,
+            objects: [],
+            sceneHistory: [],
+            startTime: Date.now(),
+            animationEnabled: true,
+            objectIdCounter: 0
+        };
+
+        // 日志系统
+        const Logger = {
+            log: (message, type = 'info') => {
+                const container = document.getElementById('logContainer');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+
+                const time = new Date().toLocaleTimeString();
+                const typeClass = `log-${type}`;
+
+                entry.innerHTML = `
+                    <span class="log-time">${time}</span>
+                    <span class="${typeClass}">${message}</span>
+                `;
+
+                container.appendChild(entry);
+                container.scrollTop = container.scrollHeight;
+
+                // 限制日志数量
+                while (container.children.length > 100) {
+                    container.removeChild(container.firstChild);
+                }
+            }
+        };
+
+        // 初始化应用
+        async function initialize() {
+            try {
+                Logger.log('创建渲染器...', 'info');
+                AppState.renderer = new Renderer({
+                    targetFPS: 60,
+                    enableProfiling: true
+                });
+
+                AppState.canvas = document.getElementById('canvas');
+                AppState.canvas.width = AppState.canvas.parentElement.clientWidth;
+                AppState.canvas.height = AppState.canvas.parentElement.clientHeight - 60;
+
+                Logger.log('初始化 WebGL2 上下文...', 'info');
+                AppState.renderer.attachTo(AppState.canvas);
+
+                Logger.log('创建基础场景对象...', 'info');
+                createBaseObjects();
+
+                Logger.log('启动渲染循环...', 'info');
+                AppState.renderer.start();
+
+                Logger.log('应用启动成功！', 'success');
+
+                // 隐藏加载界面
+                document.getElementById('loadingOverlay').classList.add('hidden');
+
+                // 启动更新循环
+                startUpdateLoop();
+
+                // 窗口大小改变事件
+                window.addEventListener('resize', handleResize);
+
+            } catch (error) {
+                Logger.log(`初始化失败: ${error.message}`, 'error');
+                console.error(error);
+                alert('WebGL2 不被支持，请使用现代浏览器');
+            }
+        }
+
+        // 创建基础对象
+        function createBaseObjects() {
+            const colors = [
+                [1.0, 0.3, 0.3],  // 红色
+                [0.3, 1.0, 0.3],  // 绿色
+                [0.3, 0.3, 1.0],  // 蓝色
+                [1.0, 1.0, 0.3],  // 黄色
+                [1.0, 0.3, 1.0],  // 品红
+            ];
+
+            colors.forEach((color, index) => {
+                const obj = createObject(color, index);
+                AppState.objects.push(obj);
+            });
+
+            Logger.log(`创建了 ${colors.length} 个基础对象`, 'success');
+        }
+
+        // 创建渲染对象
+        function createObject(color, id) {
+            const obj = {
+                id: id !== undefined ? id : `obj-${AppState.objectIdCounter++}`,
+                color: color || [Math.random(), Math.random(), Math.random()],
+                priority: 10,
+                visible: true,
+                x: Math.random() * 2 - 1,
+                y: Math.random() * 2 - 1,
+                size: 0.1 + Math.random() * 0.1,
+                vx: (Math.random() - 0.5) * 0.002,
+                vy: (Math.random() - 0.5) * 0.002,
+
+                render: (renderer) => {
+                    const gl = renderer.gl;
+
+                    // 清空画布
+                    gl.clearColor(0.1, 0.1, 0.15, 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+                    // 更新位置（动画）
+                    if (AppState.animationEnabled && obj.visible) {
+                        obj.x += obj.vx;
+                        obj.y += obj.vy;
+
+                        // 边界反弹
+                        if (obj.x < -1 || obj.x > 1) obj.vx *= -1;
+                        if (obj.y < -1 || obj.y > 1) obj.vy *= -1;
+                    }
+                }
+            };
+
+            // 注册到渲染器
+            AppState.renderer.addNode(obj);
+            Logger.log(`创建对象: ${obj.id}`, 'info');
+
+            return obj;
+        }
+
+        // 启动更新循环
+        function startUpdateLoop() {
+            setInterval(() => {
+                updateUI();
+            }, 100);
+        }
+
+        // 更新 UI
+        function updateUI() {
+            const stats = AppState.renderer.getStats();
+            if (!stats) return;
+
+            document.getElementById('fps').textContent = stats.fps;
+            document.getElementById('frameTime').textContent = `${stats.frameTime.toFixed(2)} ms`;
+            document.getElementById('objectCount').textContent = AppState.objects.filter(o => o.visible).length;
+            document.getElementById('resourceCount').textContent = stats.resourceCount;
+
+            const runtime = (Date.now() - AppState.startTime) / 1000;
+            document.getElementById('runtime').textContent = `${runtime.toFixed(0)}s`;
+        }
+
+        // 处理窗口大小改变
+        function handleResize() {
+            if (AppState.canvas && AppState.renderer) {
+                const container = AppState.canvas.parentElement;
+                AppState.canvas.width = container.clientWidth;
+                AppState.canvas.height = container.clientHeight - 60;
+                AppState.renderer.resize(AppState.canvas.width, AppState.canvas.height);
+                Logger.log(`画布大小调整为: ${AppState.canvas.width}x${AppState.canvas.height}`, 'info');
+            }
+        }
+
+        // 全局函数
+        window.addObject = () => {
+            const obj = createObject();
+            AppState.objects.push(obj);
+            Logger.log('添加新对象', 'success');
+        };
+
+        window.removeObject = () => {
+            const visibleObjects = AppState.objects.filter(o => o.visible);
+            if (visibleObjects.length === 0) {
+                Logger.log('没有可移除的对象', 'warning');
+                return;
+            }
+
+            const randomIndex = Math.floor(Math.random() * visibleObjects.length);
+            const obj = visibleObjects[randomIndex];
+            obj.visible = false;
+            AppState.renderer.removeNode(obj.id);
+            Logger.log(`移除对象: ${obj.id}`, 'info');
+        };
+
+        window.clearScene = () => {
+            if (confirm('确定要清空所有对象吗？')) {
+                AppState.objects.forEach(obj => {
+                    AppState.renderer.removeNode(obj.id);
+                });
+                AppState.objects = [];
+                Logger.log('场景已清空', 'warning');
+            }
+        };
+
+        window.saveScene = () => {
+            const sceneData = AppState.objects.map(obj => ({
+                id: obj.id,
+                color: obj.color,
+                x: obj.x,
+                y: obj.y,
+                size: obj.size
+            }));
+
+            const blob = new Blob([JSON.stringify(sceneData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `scene-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            Logger.log('场景已保存', 'success');
+        };
+
+        window.loadScene = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const sceneData = JSON.parse(event.target.result);
+
+                        // 清空当前场景
+                        AppState.objects.forEach(obj => {
+                            AppState.renderer.removeNode(obj.id);
+                        });
+                        AppState.objects = [];
+
+                        // 加载场景数据
+                        sceneData.forEach(data => {
+                            const obj = {
+                                ...data,
+                                priority: 10,
+                                visible: true,
+                                vx: (Math.random() - 0.5) * 0.002,
+                                vy: (Math.random() - 0.5) * 0.002,
+                                render: (renderer) => {
+                                    const gl = renderer.gl;
+                                    gl.clearColor(0.1, 0.1, 0.15, 1.0);
+                                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                                }
+                            };
+
+                            AppState.renderer.addNode(obj);
+                            AppState.objects.push(obj);
+                        });
+
+                        Logger.log(`场景已加载: ${sceneData.length} 个对象`, 'success');
+                    } catch (error) {
+                        Logger.log(`加载场景失败: ${error.message}`, 'error');
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+
+        window.toggleAnimation = () => {
+            AppState.animationEnabled = !AppState.animationEnabled;
+            Logger.log(AppState.animationEnabled ? '动画已启用' : '动画已暂停', 'info');
+        };
+
+        window.createScene = () => {
+            const name = prompt('请输入场景名称:');
+            if (name) {
+                const sceneList = document.getElementById('sceneList');
+                const item = document.createElement('div');
+                item.className = 'scene-item';
+                item.innerHTML = `
+                    <span>${name}</span>
+                    <div class="scene-actions">
+                        <button class="mini-btn" onclick="loadNamedScene('${name}')">加载</button>
+                        <button class="mini-btn danger" onclick="deleteNamedScene('${name}')">删除</button>
+                    </div>
+                `;
+                sceneList.appendChild(item);
+                Logger.log(`场景 "${name}" 已创建`, 'success');
+            }
+        };
+
+        window.toggleFullscreen = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        };
+
+        window.exportStats = () => {
+            const stats = AppState.renderer.getStats();
+            if (!stats) return;
+
+            const report = {
+                timestamp: new Date().toISOString(),
+                stats: {
+                    fps: stats.fps,
+                    frameTime: stats.frameTime,
+                    nodeCount: stats.nodeCount,
+                    resourceCount: stats.resourceCount
+                },
+                objects: AppState.objects.length,
+                runtime: (Date.now() - AppState.startTime) / 1000
+            };
+
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `stats-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            Logger.log('统计报告已导出', 'success');
+        };
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            if (AppState.renderer) {
+                AppState.renderer.stop();
+                AppState.renderer.dispose();
+            }
+        });
+
+        // 启动应用
+        initialize();
+    </script>
+</body>
+</html>

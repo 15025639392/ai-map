@@ -1,0 +1,1 @@
+{"version":3,"file":"types.js","sourceRoot":"","sources":["../../src/renderer/types.ts"],"names":[],"mappings":"AAyIA;;GAEG;AACH,MAAM,CAAN,IAAY,UAkBX;AAlBD,WAAY,UAAU;IACpB,eAAe;IACf,yCAA2B,CAAA;IAE3B,cAAc;IACd,6BAAe,CAAA;IAEf,UAAU;IACV,6BAAe,CAAA;IAEf,UAAU;IACV,+BAAiB,CAAA;IAEjB,UAAU;IACV,iCAAmB,CAAA;IAEnB,UAAU;IACV,mCAAqB,CAAA;AACvB,CAAC,EAlBW,UAAU,KAAV,UAAU,QAkBrB"}

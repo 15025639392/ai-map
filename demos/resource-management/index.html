@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>资源管理 - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .resource-list {
+            margin-top: 20px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .resource-item {
+            background: white;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .resource-info {
+            flex: 1;
+        }
+
+        .resource-id {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .resource-type {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .resource-refcount {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .stats {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            opacity: 0.9;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 资源管理 - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+
+        <div class="controls">
+            <button onclick="createTexture()">创建纹理</button>
+            <button onclick="createBuffer()">创建缓冲区</button>
+            <button onclick="createProgram()">创建着色器程序</button>
+            <button onclick="addRef()">增加引用</button>
+            <button onclick="releaseRef()">释放引用</button>
+            <button onclick="detectLeaks()">检测泄漏</button>
+            <button onclick="disposeAll()">清理所有资源</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">FPS</div>
+                <div class="stat-value" id="fps">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">资源总数</div>
+                <div class="stat-value" id="resourceCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">纹理数</div>
+                <div class="stat-value" id="textureCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">缓冲区数</div>
+                <div class="stat-value" id="bufferCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">程序数</div>
+                <div class="stat-value" id="programCount">0</div>
+            </div>
+        </div>
+
+        <div class="resource-list">
+            <h3 style="margin-top: 0;">资源列表</h3>
+            <div id="resourceList"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer } from '../../lib/index.js';
+
+        // 创建渲染器
+        const renderer = new Renderer({
+            targetFPS: 60,
+            enableProfiling: true
+        });
+
+        // 获取画布
+        const canvas = document.getElementById('canvas');
+
+        // 资源计数器
+        let resourceIdCounter = 0;
+
+        try {
+            // 附加到画布
+            renderer.attachTo(canvas);
+
+            // 添加一个基础渲染节点
+            const baseNode = {
+                id: 'base-node',
+                priority: 10,
+                visible: true,
+                render: (renderer) => {
+                    const gl = renderer.gl;
+                    gl.clearColor(0.2, 0.3, 0.4, 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                }
+            };
+
+            renderer.addNode(baseNode);
+            renderer.start();
+
+            console.log('✅ 资源管理示例启动成功！');
+
+            // 更新统计信息
+            setInterval(updateStats, 100);
+
+            // 全局函数
+            window.createTexture = () => {
+                const id = `texture-${resourceIdCounter++}`;
+                const gl = renderer.gl;
+                const texture = gl.createTexture();
+
+                if (texture) {
+                    renderer.resourceManager.registerResource(
+                        id,
+                        'texture',
+                        texture,
+                        () => gl.deleteTexture(texture)
+                    );
+
+                    console.log(`✓ 创建纹理: ${id}`);
+                    updateResourceList();
+                }
+            };
+
+            window.createBuffer = () => {
+                const id = `buffer-${resourceIdCounter++}`;
+                const gl = renderer.gl;
+                const buffer = gl.createBuffer();
+
+                if (buffer) {
+                    renderer.resourceManager.registerResource(
+                        id,
+                        'buffer',
+                        buffer,
+                        () => gl.deleteBuffer(buffer)
+                    );
+
+                    console.log(`✓ 创建缓冲区: ${id}`);
+                    updateResourceList();
+                }
+            };
+
+            window.createProgram = () => {
+                const id = `program-${resourceIdCounter++}`;
+                const gl = renderer.gl;
+                const program = gl.createProgram();
+
+                if (program) {
+                    renderer.resourceManager.registerResource(
+                        id,
+                        'program',
+                        program,
+                        () => gl.deleteProgram(program)
+                    );
+
+                    console.log(`✓ 创建程序: ${id}`);
+                    updateResourceList();
+                }
+            };
+
+            window.addRef = () => {
+                const info = renderer.resourceManager.getResourceInfo();
+                if (info.length === 0) {
+                    alert('没有可操作的资源');
+                    return;
+                }
+
+                const randomResource = info[Math.floor(Math.random() * info.length)];
+                renderer.resourceManager.addRef(randomResource.id);
+                console.log(`✓ ${randomResource.id} 引用计数 +1`);
+                updateResourceList();
+            };
+
+            window.releaseRef = () => {
+                const info = renderer.resourceManager.getResourceInfo();
+                if (info.length === 0) {
+                    alert('没有可操作的资源');
+                    return;
+                }
+
+                const randomResource = info[Math.floor(Math.random() * info.length)];
+                if (randomResource.refCount <= 1) {
+                    alert(`${randomResource.id} 引用计数已为最低值`);
+                    return;
+                }
+
+                renderer.resourceManager.releaseRef(randomResource.id);
+                console.log(`✓ ${randomResource.id} 引用计数 -1`);
+                updateResourceList();
+            };
+
+            window.detectLeaks = () => {
+                const leaks = renderer.resourceManager.detectLeaks();
+                if (leaks.length === 0) {
+                    alert('✅ 未检测到资源泄漏');
+                } else {
+                    alert(`⚠️ 检测到 ${leaks.length} 个潜在泄漏:\n${leaks.join('\n')}`);
+                }
+            };
+
+            window.disposeAll = () => {
+                if (confirm('确定要清理所有资源吗？')) {
+                    renderer.resourceManager.disposeAll();
+                    resourceIdCounter = 0;
+                    updateResourceList();
+                    console.log('✓ 已清理所有资源');
+                }
+            };
+
+            // 初始创建一些资源
+            for (let i = 0; i < 3; i++) {
+                window.createTexture();
+                window.createBuffer();
+            }
+
+            updateResourceList();
+
+        } catch (error) {
+            console.error('❌ 初始化失败:', error);
+            alert('WebGL2 不被支持，请使用现代浏览器');
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const stats = renderer.getStats();
+            if (!stats) return;
+
+            document.getElementById('fps').textContent = stats.fps;
+
+            const info = renderer.resourceManager.getResourceInfo();
+            document.getElementById('resourceCount').textContent = info.length;
+            document.getElementById('textureCount').textContent =
+                info.filter(r => r.type === 'texture').length;
+            document.getElementById('bufferCount').textContent =
+                info.filter(r => r.type === 'buffer').length;
+            document.getElementById('programCount').textContent =
+                info.filter(r => r.type === 'program').length;
+        }
+
+        // 更新资源列表显示
+        function updateResourceList() {
+            const info = renderer.resourceManager.getResourceInfo();
+            const listElement = document.getElementById('resourceList');
+
+            if (info.length === 0) {
+                listElement.innerHTML = '<p style="color: #999; text-align: center;">暂无资源</p>';
+                return;
+            }
+
+            listElement.innerHTML = info.map(r => `
+                <div class="resource-item">
+                    <div class="resource-info">
+                        <div class="resource-id">${r.id}</div>
+                        <div class="resource-type">类型: ${r.type}</div>
+                    </div>
+                    <div class="resource-refcount">引用: ${r.refCount}</div>
+                </div>
+            `).join('');
+        }
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            renderer.dispose();
+        });
+    </script>
+</body>
+</html>

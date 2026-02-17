@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多节点渲染 - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+            cursor: pointer;
+        }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .stats {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 多节点渲染 - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+
+        <div class="controls">
+            <button onclick="addRandomNode()">添加随机节点</button>
+            <button onclick="removeRandomNode()">移除随机节点</button>
+            <button onclick="toggleVisibility()">切换可见性</button>
+            <button onclick="changePrioritys()">调整优先级</button>
+            <button onclick="clearNodes()">清空节点</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">FPS</div>
+                <div class="stat-value" id="fps">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">节点数</div>
+                <div class="stat-value" id="nodeCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">可见节点</div>
+                <div class="stat-value" id="visibleCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">资源数</div>
+                <div class="stat-value" id="resourceCount">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer } from '../../lib/index.js';
+
+        // 创建渲染器
+        const renderer = new Renderer({
+            targetFPS: 60,
+            enableProfiling: true
+        });
+
+        // 获取画布
+        const canvas = document.getElementById('canvas');
+
+        // 存储节点引用
+        const nodes = [];
+        let nodeIdCounter = 0;
+
+        try {
+            // 附加到画布
+            renderer.attachTo(canvas);
+
+            // 创建初始节点
+            const initialColors = [
+                [1.0, 0.3, 0.3],  // 红色
+                [0.3, 1.0, 0.3],  // 绿色
+                [0.3, 0.3, 1.0],  // 蓝色
+                [1.0, 1.0, 0.3],  // 黄色
+                [1.0, 0.3, 1.0],  // 品红
+            ];
+
+            initialColors.forEach((color, index) => {
+                createNode(color, index);
+            });
+
+            // 启动渲染循环
+            renderer.start();
+
+            console.log('✅ 多节点渲染引擎启动成功！');
+
+            // 更新统计信息
+            setInterval(updateStats, 100);
+
+            // 全局函数（供 HTML 按钮调用）
+            window.addRandomNode = () => {
+                const color = [Math.random(), Math.random(), Math.random()];
+                createNode(color, nodeIdCounter++);
+            };
+
+            window.removeRandomNode = () => {
+                if (nodes.length === 0) {
+                    alert('没有可移除的节点');
+                    return;
+                }
+                const randomIndex = Math.floor(Math.random() * nodes.length);
+                const node = nodes[randomIndex];
+                renderer.removeNode(node.id);
+                nodes.splice(randomIndex, 1);
+            };
+
+            window.toggleVisibility = () => {
+                if (nodes.length === 0) return;
+                const randomIndex = Math.floor(Math.random() * nodes.length);
+                nodes[randomIndex].node.visible = !nodes[randomIndex].node.visible;
+            };
+
+            window.changePrioritys = () => {
+                nodes.forEach((item, index) => {
+                    item.node.priority = Math.floor(Math.random() * 20);
+                    console.log(`节点 ${item.node.id} 优先级调整为: ${item.node.priority}`);
+                });
+            };
+
+            window.clearNodes = () => {
+                nodes.forEach(item => renderer.removeNode(item.node.id));
+                nodes.length = 0;
+                nodeIdCounter = 0;
+            };
+
+        } catch (error) {
+            console.error('❌ 初始化失败:', error);
+            alert('WebGL2 不被支持，请使用现代浏览器');
+        }
+
+        // 创建节点
+        function createNode(color, id) {
+            const node = {
+                id: `node-${id}`,
+                priority: Math.floor(Math.random() * 20),
+                visible: true,
+                render: (renderer) => {
+                    const gl = renderer.gl;
+
+                    // 清空画布为当前节点颜色
+                    gl.clearColor(color[0], color[1], color[2], 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+
+                    // 可以在这里添加更多渲染逻辑
+                    // 例如绘制特定的图形
+                }
+            };
+
+            renderer.addNode(node);
+            nodes.push({ id: node.id, node });
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const stats = renderer.getStats();
+            if (!stats) return;
+
+            document.getElementById('fps').textContent = stats.fps;
+            document.getElementById('nodeCount').textContent = stats.nodeCount;
+            document.getElementById('visibleCount').textContent =
+                nodes.filter(n => n.node.visible).length;
+            document.getElementById('resourceCount').textContent = stats.resourceCount;
+        }
+
+        // 页面关闭时清理
+        window.addEventListener('beforeunload', () => {
+            renderer.dispose();
+        });
+    </script>
+</body>
+</html>

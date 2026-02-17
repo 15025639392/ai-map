@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World - WebGL2 渲染引擎</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+        }
+
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Hello World - WebGL2 渲染引擎</h1>
+    <div id="container">
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div class="info">
+            <strong>功能演示：</strong>
+            <ul>
+                <li>✓ WebGL2 上下文初始化</li>
+                <li>✓ 渲染主循环启动</li>
+                <li>✓ 简单渲染节点</li>
+                <li>✓ 实时帧率显示</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Renderer } from '../../lib/index.js';
+
+        // 创建渲染器
+        const renderer = new Renderer({
+            targetFPS: 60,
+            enableProfiling: true
+        });
+
+        // 获取画布
+        const canvas = document.getElementById('canvas');
+
+        try {
+            // 附加到画布
+            renderer.attachTo(canvas);
+
+            // 添加一个简单的渲染节点
+            const helloNode = {
+                id: 'hello-world',
+                priority: 10,
+                visible: true,
+                render: (renderer) => {
+                    const gl = renderer.gl;
+
+                    // 清空画布为蓝色
+                    gl.clearColor(0.2, 0.4, 0.8, 1.0);
+                    gl.clear(gl.COLOR_BUFFER_BIT);
+
+                    // 绘制一个简单的矩形（模拟）
+                    // 注意：实际 WebGL 绘制需要着色器和顶点数据
+                    // 这里只是演示渲染循环的工作方式
+                }
+            };
+
+            renderer.addNode(helloNode);
+
+            // 启动渲染循环
+            renderer.start();
+
+            console.log('✅ 渲染引擎启动成功！');
+
+            // 每 1000ms 输出统计信息
+            setInterval(() => {
+                const stats = renderer.getStats();
+                if (stats) {
+                    console.log(`FPS: ${stats.fps}, 节点数: ${stats.nodeCount}, 资源数: ${stats.resourceCount}`);
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('❌ 初始化失败:', error);
+            alert('WebGL2 不被支持，请使用现代浏览器');
+        }
+    </script>
+</body>
+</html>
